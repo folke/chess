@@ -1,12 +1,15 @@
-﻿using ChessChallenge.API;
-using System;
+﻿using System;
+using ChessChallenge.API;
 
 public class MyBot : IChessBot
 {
     private int maxDepth = 3;
+    private int quiescenceDepth = 3;
+    private int evals = 0;
 
     public Move Think(Board board, Timer timer)
     {
+        evals = 0;
         double current = EvaluateBoard(board);
         Console.WriteLine($"MyBot: {current}");
 
@@ -14,7 +17,7 @@ public class MyBot : IChessBot
         double bestScore = double.NegativeInfinity;
 
         Move[] moves = board.GetLegalMoves();
-        foreach (var move in moves)
+        foreach (Move move in moves)
         {
             board.MakeMove(move);
             double score = -AlphaBeta(double.NegativeInfinity, double.PositiveInfinity, maxDepth - 1, board);
@@ -26,34 +29,46 @@ public class MyBot : IChessBot
                 bestMove = move;
             }
         }
-        Console.WriteLine($"MyBot: {bestMove} ({bestScore})");
-        board.MakeMove(bestMove);
-        if (board.IsInCheckmate())
-        {
-            Console.WriteLine("MyBot: Checkmate!");
-        }
-        else if (board.IsDraw())
-        {
-            Console.WriteLine("MyBot: Draw!");
-        }
-        else if (board.IsInCheck())
-        {
-            Console.WriteLine("MyBot: Check!");
-        }
+        Console.WriteLine($"MyBot: {bestMove} ({bestScore}) in {evals} evals");
 
         return bestMove;
+    }
+
+    private double Quiescence(double alpha, double beta, int depth, Board board)
+    {
+        double standPat = EvaluateBoard(board);
+        if (depth == 0)
+            return standPat;
+        if (standPat >= beta)
+            return beta;
+        if (alpha < standPat)
+            alpha = standPat;
+
+        Move[] moves = board.GetLegalMoves(true); // Assuming this method returns only capturing moves.
+        foreach (Move move in moves)
+        {
+            board.MakeMove(move);
+            double score = -Quiescence(-beta, -alpha, depth - 1, board);
+            board.UndoMove(move);
+
+            if (score >= beta)
+                return beta;
+            if (score > alpha)
+                alpha = score;
+        }
+        return alpha;
     }
 
 
     private double AlphaBeta(double alpha, double beta, int depth, Board board)
     {
-        if (depth == 0 || board.IsInCheckmate() || board.IsDraw())
+        if (depth == 0)
         {
-            return EvaluateBoard(board);
+            return Quiescence(alpha, beta, quiescenceDepth, board);
         }
 
         Move[] moves = board.GetLegalMoves();
-        foreach (var move in moves)
+        foreach (Move move in moves)
         {
             board.MakeMove(move);
             double score = -AlphaBeta(-beta, -alpha, depth - 1, board);
@@ -71,40 +86,23 @@ public class MyBot : IChessBot
 
     private double EvaluateBoard(Board board)
     {
+        evals++;
         if (board.IsDraw())
-        {
             return 0;
-        }
-
         if (board.IsInCheckmate())
-        {
             return board.IsWhiteToMove ? double.NegativeInfinity : double.PositiveInfinity;
-        }
         double score = 0.0;
-        int whitePieceCount = 0;
-        int blackPieceCount = 0;
-
         PieceList[] pieceLists = board.GetAllPieceLists();
-        foreach (var pieceList in pieceLists)
+        foreach (PieceList pieceList in pieceLists)
         {
             for (int i = 0; i < pieceList.Count; i++)
             {
                 Piece piece = pieceList.GetPiece(i);
-                if (piece.IsWhite)
-                {
-                    whitePieceCount++;
-                }
-                else
-                {
-                    blackPieceCount++;
-                }
-
                 double pieceValue = PieceValues[(int)piece.PieceType - 1];
                 double positionValue = GetPositionValue(piece);
                 score += (pieceValue + positionValue) * (piece.IsWhite ? 1 : -1);
             }
         }
-        int totalPieceCount = whitePieceCount + blackPieceCount;
         return board.IsWhiteToMove ? score : -score;
     }
 
@@ -155,7 +153,7 @@ public class MyBot : IChessBot
             -20, -10, -10, -10, -10, -10, -10, -20
         },
         // Rook
-        new double[]
+           new double[]
         {
             0, 0, 0, 0, 0, 0, 0, 0,
             5, 10, 10, 10, 10, 10, 10, 5,
