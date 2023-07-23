@@ -4,9 +4,16 @@ using System.Linq;
 using System.Numerics;
 using ChessChallenge.API;
 
+public class Transposition
+{
+    public Move? BestMove { get; set; }
+    public int Depth { get; set; }
+    public double Score { get; set; }
+}
+
 public class MyBot : IChessBot
 {
-    private readonly int maxDepth = 10;
+    private readonly int maxDepth = 9;
     private readonly int quiescenceDepth = 3;
     private int evals;
     private readonly int[][] mg_pesto_table = Unpack(mg_pesto_packed);
@@ -15,12 +22,19 @@ public class MyBot : IChessBot
     private readonly int[] eg_value = { 94, 281, 297, 512, 936, 0 };
     private readonly int[] gamephaseInc = { 0, 1, 1, 2, 4, 0 };
     private Move[,] killerTable = new Move[64, 2]; // killer moves for each depth
-    Timer timer;
-    int timeLimit = 0;
+    private Timer timer;
+    private int timeLimit;
+    private readonly Dictionary<ulong, Transposition> transpositionTable = new();
+
+    public MyBot()
+    {
+        new ChessTables().Generate();
+    }
 
     public Move Think(Board board, Timer timer)
     {
         killerTable = new Move[64, 2]; // killer moves for each depth
+        transpositionTable.Clear();
         evals = 0;
         double current = EvaluateBoard(board);
         Console.WriteLine($"MyBot: {current / 100.0}");
@@ -30,28 +44,23 @@ public class MyBot : IChessBot
                 ? 0.01
                 : pieces > 12
                     ? 0.05
-                    : 0.2;
+                    : 0.1;
         this.timer = timer;
         timeLimit = (int)(timer.MillisecondsRemaining * ratio); // calculate time limit for this move
         Console.WriteLine($"MyBot: time limit = {timeLimit} ms");
 
-        Move bestMove = Move.NullMove;
-        Move prevBestMove;
-        double bestScore = double.NegativeInfinity;
-        double prevBestScore = double.NegativeInfinity;
-
-        for (int depth = 1; depth <= maxDepth; depth++)
+        Move[] moves = OrderMoves(board.GetLegalMoves(), 0).Reverse().ToArray();
+        // keep track of scores for each move so we can sort them
+        double[] scores = new double[moves.Length];
+        try
         {
-            prevBestMove = bestMove;
-            prevBestScore = bestScore;
-            bestScore = double.NegativeInfinity;
-            Move[] moves = board.GetLegalMoves();
-            foreach (Move move in moves)
+            for (int depth = 1; depth <= maxDepth; depth++)
             {
-                board.MakeMove(move);
-                try
+                for (int i = moves.Length - 1; i >= 0; i--)
                 {
-                    double score = -AlphaBeta(
+                    Move move = moves[i];
+                    board.MakeMove(move);
+                    scores[i] = -AlphaBeta(
                         double.NegativeInfinity,
                         double.PositiveInfinity,
                         depth - 1,
@@ -59,49 +68,34 @@ public class MyBot : IChessBot
                         board
                     );
                     board.UndoMove(move);
-
-                    if (score > bestScore)
-                    {
-                        bestScore = score;
-                        bestMove = move;
-                    }
                 }
-                catch (TimeoutException)
-                {
-                    bestMove = prevBestMove;
-                    bestScore = prevBestScore;
-                    break;
-                }
+                Console.WriteLine(
+                    $"MyBot: {moves.Last()} ({scores.Last() / 100.0}) in {evals} evals (depth {depth})"
+                );
+                Array.Sort(scores, moves);
             }
-            Console.WriteLine(
-                $"MyBot: {bestMove} ({bestScore / 100.0}) in {evals} evals (depth {depth})"
-            );
-            if (!ContinueSearch())
-                break;
         }
-
-        return bestMove;
-    }
-
-    private bool ContinueSearch()
-    {
-        return timer.MillisecondsElapsedThisTurn < timeLimit;
+        catch (TimeoutException) { }
+        return moves.Last();
     }
 
     private double AlphaBeta(double alpha, double beta, int depth, bool quiescence, Board board)
     {
-        if (!ContinueSearch())
+        if (timer.MillisecondsElapsedThisTurn >= timeLimit)
             throw new TimeoutException();
 
+        // Check transposition table
+        Transposition? trans = transpositionTable.GetValueOrDefault(board.ZobristKey);
+        if (trans != null && trans.Depth >= depth)
+            return trans.Score;
+
+        double bestScore = -1000000 + board.PlyCount;
         if (quiescence)
         {
             double standPat = EvaluateBoard(board);
-            if (depth == 0)
+            if (depth == 0 || standPat >= beta)
                 return standPat;
-            if (standPat >= beta)
-                return beta;
-            if (alpha < standPat)
-                alpha = standPat;
+            bestScore = alpha = Math.Max(alpha, standPat);
         }
         else if (depth == 0)
             return AlphaBeta(alpha, beta, quiescenceDepth - 1, true, board);
@@ -109,6 +103,8 @@ public class MyBot : IChessBot
         Move[] moves = board.GetLegalMoves(quiescence);
         if (!quiescence)
             moves = OrderMoves(moves, depth); // apply move ordering
+
+        Move? bestMove = null;
         foreach (Move move in moves)
         {
             board.MakeMove(move);
@@ -124,22 +120,32 @@ public class MyBot : IChessBot
             if (score >= beta)
             {
                 // if the move is not a capture (to avoid polluting the killer table with tactical moves)
-                if (!quiescence && !move.IsCapture)
+                if (!quiescence && !move.IsCapture && killerTable[depth, 0] != move)
                 {
                     // Update the killer table
-                    if (killerTable[depth, 0] != move)
-                    {
-                        killerTable[depth, 1] = killerTable[depth, 0];
-                        killerTable[depth, 0] = move;
-                    }
+                    killerTable[depth, 1] = killerTable[depth, 0];
+                    killerTable[depth, 0] = move;
                 }
-                return quiescence ? beta : score; // Beta cut-off
+                bestScore = score;
+                bestMove = move;
+                break;
             }
-            if (score > alpha)
-                alpha = score; // Alpha gets updated
+            if (score > bestScore)
+            {
+                bestScore = score;
+                bestMove = move;
+                if (score > alpha)
+                    alpha = score;
+            }
         }
-
-        return alpha;
+        if (!quiescence && (trans == null || depth > trans.Depth))
+            transpositionTable[board.ZobristKey] = new Transposition
+            {
+                BestMove = bestMove,
+                Depth = depth,
+                Score = bestScore
+            };
+        return bestScore;
     }
 
     private double EvaluateBoard(Board board)
@@ -148,21 +154,20 @@ public class MyBot : IChessBot
         if (board.IsDraw())
             return 0;
         if (board.IsInCheckmate())
-            return board.IsWhiteToMove ? double.NegativeInfinity : double.PositiveInfinity;
+            return board.IsWhiteToMove ? -1000000 + board.PlyCount : 1000000 - board.PlyCount;
 
         int[] mg = { 0, 0 };
         int[] eg = { 0, 0 };
         int gamePhase = 0;
 
-        PieceList[] pieceLists = board.GetAllPieceLists();
-        foreach (PieceList pieceList in pieceLists)
+        foreach (PieceList pieceList in board.GetAllPieceLists())
         {
             for (int i = 0; i < pieceList.Count; i++)
             {
                 Piece piece = pieceList.GetPiece(i);
                 int p = (int)piece.PieceType - 1;
                 int c = piece.IsWhite ? 0 : 1;
-                int sq = piece.IsWhite ? piece.Square.Index : piece.Square.Index ^ 56;
+                int sq = piece.IsWhite ? piece.Square.Index ^ 56 : piece.Square.Index;
                 mg[c] += mg_value[p] + mg_pesto_table[p][sq];
                 eg[c] += eg_value[p] + eg_pesto_table[p][sq];
                 gamePhase += gamephaseInc[p];
@@ -186,13 +191,7 @@ public class MyBot : IChessBot
         {
             unpacked[i] = new int[64];
             for (int j = 0; j < 64; j++)
-            {
-                unpacked[i][j] = BitConverter.ToInt16(
-                    BitConverter.GetBytes(
-                        (ushort)((packed[i * 16 + j / 4] >> (16 * (j % 4))) & 0xFFFF)
-                    )
-                );
-            }
+                unpacked[i][j] = (short)((int)(packed[i * 16 + j / 4] >> (16 * (j % 4))) & 0xFFFF);
         }
         return unpacked;
     }
@@ -213,13 +212,12 @@ public class MyBot : IChessBot
                 .OrderByDescending(
                     m =>
                         m.IsCapture
-                            ? mg_value[(int)m.CapturePieceType - 1]
+                            ? mg_value[(int)m.CapturePieceType - 1] * 10
                                 - mg_value[(int)m.MovePieceType - 1]
                             : 0
                 )
                 .Except(orderedMoves)
         );
-
         return orderedMoves.ToArray();
     }
 
