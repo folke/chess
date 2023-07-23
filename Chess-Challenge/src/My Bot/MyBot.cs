@@ -1,11 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Numerics;
 using ChessChallenge.API;
 
 public class MyBot : IChessBot
 {
-    private readonly int maxDepth = 4;
+    private readonly int maxDepth = 10;
     private readonly int quiescenceDepth = 3;
     private int evals;
     private readonly int[][] mg_pesto_table = Unpack(mg_pesto_packed);
@@ -14,6 +15,8 @@ public class MyBot : IChessBot
     private readonly int[] eg_value = { 94, 281, 297, 512, 936, 0 };
     private readonly int[] gamephaseInc = { 0, 1, 1, 2, 4, 0 };
     private Move[,] killerTable = new Move[64, 2]; // killer moves for each depth
+    Timer timer;
+    int timeLimit = 0;
 
     public Move Think(Board board, Timer timer)
     {
@@ -21,40 +24,75 @@ public class MyBot : IChessBot
         evals = 0;
         double current = EvaluateBoard(board);
         Console.WriteLine($"MyBot: {current / 100.0}");
+        int pieces = BitOperations.PopCount(board.AllPiecesBitboard);
+        double ratio =
+            pieces > 26
+                ? 0.01
+                : pieces > 12
+                    ? 0.05
+                    : 0.2;
+        this.timer = timer;
+        timeLimit = (int)(timer.MillisecondsRemaining * ratio); // calculate time limit for this move
+        Console.WriteLine($"MyBot: time limit = {timeLimit} ms");
 
         Move bestMove = Move.NullMove;
-        double bestScore;
+        Move prevBestMove;
+        double bestScore = double.NegativeInfinity;
+        double prevBestScore = double.NegativeInfinity;
 
         for (int depth = 1; depth <= maxDepth; depth++)
         {
+            prevBestMove = bestMove;
+            prevBestScore = bestScore;
             bestScore = double.NegativeInfinity;
             Move[] moves = board.GetLegalMoves();
             foreach (Move move in moves)
             {
                 board.MakeMove(move);
-                double score = -AlphaBeta(
-                    double.NegativeInfinity,
-                    double.PositiveInfinity,
-                    maxDepth - 1,
-                    false,
-                    board
-                );
-                board.UndoMove(move);
-
-                if (score > bestScore)
+                try
                 {
-                    bestScore = score;
-                    bestMove = move;
+                    double score = -AlphaBeta(
+                        double.NegativeInfinity,
+                        double.PositiveInfinity,
+                        depth - 1,
+                        false,
+                        board
+                    );
+                    board.UndoMove(move);
+
+                    if (score > bestScore)
+                    {
+                        bestScore = score;
+                        bestMove = move;
+                    }
+                }
+                catch (TimeoutException)
+                {
+                    bestMove = prevBestMove;
+                    bestScore = prevBestScore;
+                    break;
                 }
             }
-            Console.WriteLine($"MyBot: {bestMove} ({bestScore / 100.0}) in {evals} evals");
+            Console.WriteLine(
+                $"MyBot: {bestMove} ({bestScore / 100.0}) in {evals} evals (depth {depth})"
+            );
+            if (!ContinueSearch())
+                break;
         }
 
         return bestMove;
     }
 
+    private bool ContinueSearch()
+    {
+        return timer.MillisecondsElapsedThisTurn < timeLimit;
+    }
+
     private double AlphaBeta(double alpha, double beta, int depth, bool quiescence, Board board)
     {
+        if (!ContinueSearch())
+            throw new TimeoutException();
+
         if (quiescence)
         {
             double standPat = EvaluateBoard(board);
