@@ -23,30 +23,32 @@ public class MyBot : IChessBot
         Console.WriteLine($"MyBot: {current / 100.0}");
 
         Move bestMove = Move.NullMove;
-        double bestScore = double.NegativeInfinity;
+        double bestScore;
 
-        Move[] moves = board.GetLegalMoves();
-        foreach (Move move in moves)
+        for (int depth = 1; depth <= maxDepth; depth++)
         {
-            board.MakeMove(move);
-            double score = -AlphaBeta(
-                double.NegativeInfinity,
-                double.PositiveInfinity,
-                maxDepth - 1,
-                false,
-                board
-            );
-            board.UndoMove(move);
-            // write move and score to console
-            Console.WriteLine($"{move} {score / 100.0}");
-
-            if (score > bestScore)
+            bestScore = double.NegativeInfinity;
+            Move[] moves = board.GetLegalMoves();
+            foreach (Move move in moves)
             {
-                bestScore = score;
-                bestMove = move;
+                board.MakeMove(move);
+                double score = -AlphaBeta(
+                    double.NegativeInfinity,
+                    double.PositiveInfinity,
+                    maxDepth - 1,
+                    false,
+                    board
+                );
+                board.UndoMove(move);
+
+                if (score > bestScore)
+                {
+                    bestScore = score;
+                    bestMove = move;
+                }
             }
+            Console.WriteLine($"MyBot: {bestMove} ({bestScore / 100.0}) in {evals} evals");
         }
-        Console.WriteLine($"MyBot: {bestMove} ({bestScore / 100.0}) in {evals} evals");
 
         return bestMove;
     }
@@ -83,17 +85,14 @@ public class MyBot : IChessBot
 
             if (score >= beta)
             {
-                if (!quiescence)
+                // if the move is not a capture (to avoid polluting the killer table with tactical moves)
+                if (!quiescence && !move.IsCapture)
                 {
-                    // if the move is not a capture (to avoid polluting the killer table with tactical moves)
-                    if (!move.IsCapture)
+                    // Update the killer table
+                    if (killerTable[depth, 0] != move)
                     {
-                        // Update the killer table
-                        if (killerTable[depth, 0] != move)
-                        {
-                            killerTable[depth, 1] = killerTable[depth, 0];
-                            killerTable[depth, 0] = move;
-                        }
+                        killerTable[depth, 1] = killerTable[depth, 0];
+                        killerTable[depth, 0] = move;
                     }
                 }
                 return quiescence ? beta : score; // Beta cut-off
@@ -111,7 +110,7 @@ public class MyBot : IChessBot
         if (board.IsDraw())
             return 0;
         if (board.IsInCheckmate())
-            return board.IsWhiteToMove ? -1000000 : 1000000;
+            return board.IsWhiteToMove ? double.NegativeInfinity : double.PositiveInfinity;
 
         int[] mg = { 0, 0 };
         int[] eg = { 0, 0 };
@@ -166,12 +165,22 @@ public class MyBot : IChessBot
         // First, try moves that are stored in the killer table for the current depth
         // Afterwards, try the other moves
 
-        List<Move> orderedMoves = new List<Move>();
-        if (killerTable[depth, 0] != null && moves.Contains(killerTable[depth, 0]))
-            orderedMoves.Add(killerTable[depth, 0]);
-        if (killerTable[depth, 1] != null && moves.Contains(killerTable[depth, 1]))
-            orderedMoves.Add(killerTable[depth, 1]);
-        orderedMoves.AddRange(moves.Except(orderedMoves));
+
+        List<Move> orderedMoves = new();
+        for (int i = 0; i < 2; i++)
+            if (killerTable[depth, i] != null && moves.Contains(killerTable[depth, i]))
+                orderedMoves.Add(killerTable[depth, i]);
+        orderedMoves.AddRange(
+            moves
+                .OrderByDescending(
+                    m =>
+                        m.IsCapture
+                            ? mg_value[(int)m.CapturePieceType - 1]
+                                - mg_value[(int)m.MovePieceType - 1]
+                            : 0
+                )
+                .Except(orderedMoves)
+        );
 
         return orderedMoves.ToArray();
     }
