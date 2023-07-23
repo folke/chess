@@ -3,9 +3,23 @@ using ChessChallenge.API;
 
 public class MyBot : IChessBot
 {
-    private int maxDepth = 3;
-    private int quiescenceDepth = 3;
-    private int evals = 0;
+    public static int offset = 200 + 165;
+    public static string mg_pesto_packed = "ŭŭŭŭŭŭŭŭǏǳƪǌƱǫƏŢŧŴƇƌƮƥƆřşźųƂƄŹžŖŒūŨŹžųŷŔœũũţŰŰƎšŊŬřŖŞƅƓŗŭŭŭŭŭŭŭŭÆĔŋļƪČŞĂĤńƵƑƄƫŴŜľƩƒƮǁǮƶƙŤžƀƢƒƲſƃŠűŽźƉƀƂťŖŤŹŷƀžƆŝŐĸšŪŬſşŚĄŘĳŌŜőŚŖŐűěňŔŃŴťœŽśŠƋƨſľŝƒƘƕƐƟƒūũŲƀƟƒƒŴūŧźźƇƏŹŷűŭżżżŻƈſŷűżŽŭŴƂƎŮŌŪşŘŠšņŘƍƗƍƠƬŶƌƘƈƍƧƫƽưƇƙŨƀƇƑžƚƪŽŕŢŴƇƅƐťřŉœšŬŶŦųŖŀŔŝŜŰŭŨŌŁŝřŤŬŸŧĦŚŠŮžŽŴňœőŭƊŹƨƙƘƚŕņŨŮŝƦƉƣŠŜŴŵƊƥƜƦŒŒŝŝŬžūŮŤœŤţūũŰŪşůŢūŨůŻŲŊťŸůŵżŪŮŬśŤŷŞŔŎĻĬƄŽŞĵŋůźƊŬřŦťũŇŐŤƅůŝřųƃŗŜřšŒŏŔşŉļŬŒņĿŁŌĺşşŗĿŁŏŞŒŮŴťĭłŝŶŵŞƑŹķŵőƅŻ";
+    public static string eg_pesto_packed = "ŭŭŭŭŭŭŭŭȟȚȋǳȀǱȒȨǋǑǂưƥƢƿǁƍƅźŲūűžžźŶŪŦŦťŰŬűŴŧŮŭŨŬťźŵŵŷźŭůŦŭŭŭŭŭŭŭŭĳŇŠőŎŒĮĊŔťŔūŤŔŕĹŕřŷŶŬŤŚńŜŰƃƃƃŸŵśśŧŽƆŽžűśŖŪŬżŷŪřŗŃřţŨūřŖŁŐĺŖŞŗśĻĭşŘŢťŦŤŜŕťũŴšŪŠũşůťŭŬūųŭűŪŶŹŶŻŷŰůŧŰźƀŴŷŪŤšŪŵŷźŰŦŞşśŦŬűŤŞŒŖŤŖŨŤŝŨŜźŷſżŹŹŵŲŸźźŸŪŰŵŰŴŴŴŲűŪŨŪűŰźŮůŮŬůŰŲŵűŨŧťŢũŭŨŬŦšťŝŧŧŭůŤŤŢŪŤůŰŬŨŠűřŤƃƃƈƈƀŷƁŜƁƍƖƧƆƋŭřųŶƞƜƐƀŶŰƃƅƚƦƕƦƑśƉƀƜƌƏƔƄŝŒżųŶžŷŲŗŖŏŝŝŖŉōŌőŗłŨōřńģŊśśŢżűŜšžŻžžƓƄŸŷžƄżƁƚƙźťƃƅƈƇƎƇŰśũƂƅƈƄŶŢŚŪŸƂƄŽŴŤŒŢűźŻűŨŜĸŋŘŢőşŕł";
+    int maxDepth = 3;
+    int quiescenceDepth = 2;
+    int evals;
+    int[][] mg_pesto_table = Unpack(mg_pesto_packed);
+    int[][] eg_pesto_table = Unpack(eg_pesto_packed);
+    int[] mg_value = { 82, 337, 365, 477, 1025, 0 };
+    int[] eg_value = { 94, 281, 297, 512, 936, 0 };
+    int[] gamephaseInc = { 0, 1, 1, 2, 4, 0 };
+
+    public MyBot()
+    {
+        new ChessTables().Generate();
+    }
+
 
     public Move Think(Board board, Timer timer)
     {
@@ -63,9 +77,7 @@ public class MyBot : IChessBot
     private double AlphaBeta(double alpha, double beta, int depth, Board board)
     {
         if (depth == 0)
-        {
             return Quiescence(alpha, beta, quiescenceDepth, board);
-        }
 
         Move[] moves = board.GetLegalMoves();
         foreach (Move move in moves)
@@ -84,6 +96,7 @@ public class MyBot : IChessBot
     }
 
 
+
     private double EvaluateBoard(Board board)
     {
         evals++;
@@ -91,102 +104,47 @@ public class MyBot : IChessBot
             return 0;
         if (board.IsInCheckmate())
             return board.IsWhiteToMove ? double.NegativeInfinity : double.PositiveInfinity;
-        double score = 0.0;
+
+        int[] mg = { 0, 0 };
+        int[] eg = { 0, 0 };
+        int gamePhase = 0;
+
         PieceList[] pieceLists = board.GetAllPieceLists();
         foreach (PieceList pieceList in pieceLists)
         {
             for (int i = 0; i < pieceList.Count; i++)
             {
                 Piece piece = pieceList.GetPiece(i);
-                double pieceValue = PieceValues[(int)piece.PieceType - 1];
-                double positionValue = GetPositionValue(piece);
-                score += (pieceValue + positionValue) * (piece.IsWhite ? 1 : -1);
+                int p = (int)piece.PieceType - 1;
+                int c = piece.IsWhite ? 0 : 1;
+                int sq = piece.IsWhite ? piece.Square.Index : piece.Square.Index ^ 56;
+                mg[c] += mg_value[p] + mg_pesto_table[p][sq];
+                eg[c] += eg_value[p] + eg_pesto_table[p][sq];
+                gamePhase += gamephaseInc[p];
             }
         }
-        return board.IsWhiteToMove ? score : -score;
+
+        /* tapered eval */
+        int Side2Move = board.IsWhiteToMove ? 0 : 1;
+        int other = Side2Move ^ 1;
+        int mgScore = mg[Side2Move] - mg[other];
+        int egScore = eg[Side2Move] - eg[other];
+        int mgPhase = gamePhase;
+        if (mgPhase > 24) mgPhase = 24; /* in case of early promotion */
+        int egPhase = 24 - mgPhase;
+        return (mgScore * mgPhase + egScore * egPhase) / 24;
     }
 
-
-    private double GetPositionValue(Piece piece)
+    public static int[][] Unpack(string packedString)
     {
-        int index = piece.IsWhite ? piece.Square.Index : 63 - piece.Square.Index;
-        return PieceSquareTables[(int)piece.PieceType - 1][index] / 50.0;
-    }
-    private static readonly double[] PieceValues = { 1.0, 3.0, 3.0, 5.0, 9.0, 100.0 };
-
-    private static readonly double[][] PieceSquareTables = new double[][]
-    {
-        // Pawn
-        new double[]
+        int[][] unpacked = new int[6][];
+        for (int i = 0; i < 6; i++)
         {
-            0, 0, 0, 0, 0, 0, 0, 0,
-            5, 10, 10, -20, -20, 10, 10, 5,
-            5, -5, -10, 0, 0, -10, -5, 5,
-            0, 0, 0, 20, 20, 0, 0, 0,
-            5, 5, 10, 25, 25, 10, 5, 5,
-            10, 10, 20, 30, 30, 20, 10, 10,
-            50, 50, 50, 50, 50, 50, 50, 50,
-            0, 0, 0, 0, 0, 0, 0, 0
-        },
-        // Knight
-        new double[]
-        {
-            -50, -40, -30, -30, -30, -30, -40, -50,
-            -40, -20, 0, 0, 0, 0, -20, -40,
-            -30, 0, 10, 15, 15, 10, 0, -30,
-            -30, 5, 15, 20, 20, 15, 5, -30,
-            -30, 0, 15, 20, 20, 15, 0, -30,
-            -30, 5, 10, 15, 15, 10, 5, -30,
-            -40, -20, 0, 5, 5, 0, -20, -40,
-            -50, -40, -30, -30, -30, -30, -40, -50
-        },
-        // Bishop
-        new double[]
-        {
-            -20, -10, -10, -10, -10, -10, -10, -20,
-            -10, 0, 0, 0, 0, 0, 0, -10,
-            -10, 0, 5, 10, 10, 5, 0, -10,
-            -10, 5, 5, 10, 10, 5, 5, -10,
-            -10, 0, 10, 10, 10, 10, 0, -10,
-            -10, 10, 10, 10, 10, 10, 10, -10,
-            -10, 5, 0, 0, 0, 0, 5, -10,
-            -20, -10, -10, -10, -10, -10, -10, -20
-        },
-        // Rook
-           new double[]
-        {
-            0, 0, 0, 0, 0, 0, 0, 0,
-            5, 10, 10, 10, 10, 10, 10, 5,
-            -5, 0, 0, 0, 0, 0, 0, -5,
-            -5, 0, 0, 0, 0, 0, 0, -5,
-            -5, 0, 0, 0, 0, 0, 0, -5,
-            -5, 0, 0, 0, 0, 0, 0, -5,
-            -5, 0, 0, 0, 0, 0, 0, -5,
-            0, 0, 0, 5, 5, 0, 0, 0
-        },
-        // Queen
-        new double[]
-        {
-            -20, -10, -10, -5, -5, -10, -10, -20,
-            -10, 0, 0, 0, 0, 0, 0, -10,
-            -10, 0, 5, 5, 5, 5, 0, -10,
-            -5, 0, 5, 5, 5, 5, 0, -5,
-            0, 0, 5, 5, 5, 5, 0, -5,
-            -10, 5, 5, 5, 5, 5, 0, -10,
-            -10, 0, 5, 0, 0, 0, 0, -10,
-            -20, -10, -10, -5, -5, -10, -10, -20
-        },
-        // King
-        new double[]
-        {
-            -30, -40, -40, -50, -50, -40, -40, -30,
-            -30, -40, -40, -50, -50, -40, -40, -30,
-            -30, -40, -40, -50, -50, -40, -40, -30,
-            -30, -40, -40, -50, -50, -40, -40, -30,
-            -20, -30, -30, -40, -40, -30, -30, -20,
-            -10, -20, -20, -20, -20, -20, -20, -10,
-            20, 20, 0, 0, 0, 0, 20, 20,
-            20, 30, 10, 0, 0, 10, 30, 20
+            unpacked[i] = new int[64];
+            for (int j = 0; j < 64; j++)
+                unpacked[i][j] = (short)packedString[i * 64 + j] - offset;
         }
-    };
+        return unpacked;
+    }
+
 }
