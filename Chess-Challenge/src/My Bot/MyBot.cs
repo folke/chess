@@ -9,34 +9,46 @@ public class Transposition
     public Move? BestMove;
     public int Depth;
     public double Score;
+    public int Type; // 0 = exact, 1 = lower bound, 2 = upper bound
 }
 
 public class MyBot : IChessBot
 {
-    protected readonly int maxDepth = 9,
-        quiescenceDepth = 3;
-    protected int evals;
+    protected int maxDepth = 9,
+        quiescenceDepth = 3,
+        thinkDepth;
     protected readonly int[] pesto = Unpack(pesto_packed);
-    protected readonly int[] mg_value =  { 82, 337, 365, 477, 1025, 0 },
-        eg_value =  { 94, 281, 297, 512, 936, 0 },
+    protected readonly int[] pieceValues =
+        {
+            82,
+            337,
+            365,
+            477,
+            1025,
+            0,
+            94,
+            281,
+            297,
+            512,
+            936,
+            0
+        },
         gamephaseInc =  { 0, 1, 1, 2, 4, 0 };
     protected Timer timer;
     protected Board board;
     protected double timeLimit;
     protected readonly Dictionary<ulong, Transposition> transpositionTable = new();
-
+    protected Move[] killerMoves = new Move[600],
+        thinkMoves;
     protected double[] thinkScores;
-    protected Move[] thinkMoves;
-    protected int thinkDepth;
 #if DEBUG
     protected Action OnDepth = () => { };
 #endif
 
-    public Move Think(Board board, Timer timer)
+    public Move Think(Board b, Timer t)
     {
-        this.board = board;
-        this.timer = timer;
-        transpositionTable.Clear();
+        board = b;
+        timer = t;
         int pieces = BitOperations.PopCount(board.AllPiecesBitboard);
         timeLimit =
             timer.MillisecondsRemaining
@@ -50,7 +62,6 @@ public class MyBot : IChessBot
 
         thinkMoves = GetMoves(false).Reverse().ToArray();
         thinkScores = new double[thinkMoves.Length];
-        evals = 0;
         try
         {
             for (thinkDepth = 1; thinkDepth <= maxDepth; thinkDepth++)
@@ -67,7 +78,13 @@ public class MyBot : IChessBot
                     );
                     board.UndoMove(move);
                     if (thinkScores[i] > 9000)
+                    {
+#if DEBUG
+                        Array.Sort(thinkScores, thinkMoves);
+                        OnDepth();
+#endif
                         return move;
+                    }
                 }
                 Array.Sort(thinkScores, thinkMoves);
 #if DEBUG
@@ -80,18 +97,24 @@ public class MyBot : IChessBot
         return thinkMoves.Last();
     }
 
-    protected double AlphaBeta(double alpha, double beta, int depth, bool quiescence)
+    protected virtual double AlphaBeta(double alpha, double beta, int depth, bool quiescence)
     {
-        evals++;
         if (timer.MillisecondsElapsedThisTurn >= timeLimit)
             throw new TimeoutException();
 
         // Check transposition table
         Transposition? trans = transpositionTable.GetValueOrDefault(board.ZobristKey);
-        if (trans != null && trans.Depth >= depth && (trans.Score >= beta || trans.Score <= alpha))
+        if (
+            trans?.Depth >= depth
+            && (
+                (trans.Type == 0)
+                || (trans.Type == 1 && trans.Score <= alpha)
+                || (trans.Type == 2 && trans.Score >= beta)
+            )
+        )
             return trans.Score;
 
-        double bestScore = -1000000 + board.PlyCount;
+        double bestScore = double.NegativeInfinity;
         if (board.IsDraw())
             return 0;
         if (board.IsInCheckmate())
@@ -99,7 +122,7 @@ public class MyBot : IChessBot
 
         if (quiescence)
         {
-            double standPat = EvaluateBoard(board);
+            double standPat = EvaluateBoard();
             if (depth == 0 || standPat >= beta)
                 return standPat;
             bestScore = alpha = Math.Max(alpha, standPat);
@@ -131,25 +154,34 @@ public class MyBot : IChessBot
             {
                 bestScore = score;
                 bestMove = move;
+                if (!quiescence && !move.IsCapture)
+                {
+                    // Shift killer moves
+                    int idx = 2 * board.PlyCount;
+                    killerMoves[idx + 1] = killerMoves[idx];
+                    killerMoves[idx] = move;
+                }
                 alpha = Math.Max(alpha, score);
             }
         }
-        if (!quiescence && (trans == null || depth > trans.Depth))
+        if (!quiescence && (depth > (trans?.Depth ?? 0)))
             transpositionTable[board.ZobristKey] = new Transposition
             {
                 BestMove = bestMove,
                 Depth = depth,
-                Score = bestScore
+                Score = bestScore,
+                Type =
+                    bestScore <= alpha
+                        ? 1
+                        : bestScore >= beta
+                            ? 2
+                            : 0
             };
         return bestScore;
     }
 
-    private double EvaluateBoard(Board board)
+    private double EvaluateBoard()
     {
-        /* if (board.IsDraw()) */
-        /*     return 0; */
-        /* if (board.IsInCheckmate()) */
-        /*     return (board.IsWhiteToMove ? -1 : 1) * (1000000 - board.PlyCount); */
         int[] mg =  { 0, 0 },
             eg =  { 0, 0 };
         int gamePhase = 0;
@@ -159,22 +191,24 @@ public class MyBot : IChessBot
             foreach (Piece piece in pieceList)
             {
                 int p = (int)piece.PieceType - 1,
-                    c = piece.IsWhite ? 0 : 1,
-                    sq = piece.IsWhite ? piece.Square.Index ^ 56 : piece.Square.Index;
-                mg[c] += mg_value[p] + pesto[p * 64 + sq];
-                eg[c] += eg_value[p] + pesto[p * 64 + sq + 384];
+                    c = 1,
+                    sq = piece.Square.Index;
+                if (piece.IsWhite)
+                {
+                    sq ^= 56;
+                    c = 0;
+                }
+                sq += p * 64;
+                mg[c] += pieceValues[p] + pesto[sq];
+                eg[c] += pieceValues[p + 6] + pesto[sq + 384];
                 gamePhase += gamephaseInc[p];
             }
         }
 
         /* tapered eval */
-        int Side2Move = board.IsWhiteToMove ? 0 : 1,
-            other = Side2Move ^ 1,
-            mgScore = mg[Side2Move] - mg[other],
-            egScore = eg[Side2Move] - eg[other],
-            mgPhase = Math.Min(gamePhase, 24), /* in case of early promotion */
-            egPhase = 24 - mgPhase;
-        return (mgScore * mgPhase + egScore * egPhase) / 24;
+        int side = board.IsWhiteToMove ? 0 : 1;
+        double factor = Math.Min(1, gamePhase / 24.0);
+        return (mg[side] - mg[side ^ 1]) * factor + (eg[side] - eg[side ^ 1]) * (1 - factor);
     }
 
     private Move[] GetMoves(bool capturesOnly)
@@ -185,13 +219,24 @@ public class MyBot : IChessBot
         // Order the moves based on whether they match the best move from the transposition table, and then by your existing criteria
         return board
             .GetLegalMoves(capturesOnly)
-            .OrderByDescending(m => bestMove != null && m.Equals(bestMove) ? 1 : 0)
-            .ThenByDescending(
+            .OrderByDescending(
                 m =>
-                    m.IsCapture
-                        ? mg_value[(int)m.CapturePieceType - 1] * 10
-                            - mg_value[(int)m.MovePieceType - 1]
-                        : 0
+                    (m == bestMove ? 30000 : 0)
+                    + (
+                        m == killerMoves[2 * board.PlyCount]
+                            ? 20000
+                            : m == killerMoves[2 * board.PlyCount + 1]
+                                ? 10000
+                                : 0
+                    )
+                    + (
+                        m.IsCapture
+                            ? (
+                                pieceValues[(int)m.CapturePieceType - 1]
+                                - pieceValues[(int)m.MovePieceType - 1]
+                            ) * 10
+                            : 0
+                    )
             )
             .ToArray();
     }

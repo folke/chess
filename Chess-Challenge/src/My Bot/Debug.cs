@@ -6,6 +6,7 @@ using ChessChallenge.API;
 public class DebugBot : MyBot, IChessBot
 {
     private readonly bool debug = true;
+    protected int evals;
 
     public DebugBot()
     {
@@ -17,7 +18,7 @@ public class DebugBot : MyBot, IChessBot
     {
         if (!debug)
             return base.Think(board, timer);
-
+        evals = 0;
         string fen = board.GetFenString();
         Write("fen: " + fen);
 
@@ -88,5 +89,11 @@ public class DebugBot : MyBot, IChessBot
             ret += "+";
         board.UndoMove(move);
         return ret;
+    }
+
+    protected override double AlphaBeta(double alpha, double beta, int depth, bool quiescence)
+    {
+        evals++;
+        return base.AlphaBeta(alpha, beta, depth, quiescence);
     }
 }

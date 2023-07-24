@@ -39,13 +39,13 @@ public class ChessTables
 
         int[] unpacked = MyBot.Unpack(packed);
 
-        if (unpacked.Length != pesto.Length)
+        if (unpacked.Length < pesto.Length)
         {
             Console.WriteLine("Unpacking failed");
             Console.WriteLine(" - Expected: " + pesto.Length);
             Console.WriteLine(" - Actual: " + unpacked.Length);
 
-            /* throw new Exception("Unpacking failed"); */
+            throw new Exception("Unpacking failed");
         }
 
         // Print to check if packing and unpacking was successful
