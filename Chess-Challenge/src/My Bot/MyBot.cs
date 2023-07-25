@@ -45,6 +45,9 @@ public class MyBot : IChessBot
                         ? 0.05
                         : 0.1
             ); // calculate time limit for this move
+#if DEBUG
+        timeLimit = 100;
+#endif
 
         thinkMoves = GetMoves(false).Reverse().ToArray();
         thinkScores = new double[thinkMoves.Length];
@@ -55,6 +58,11 @@ public class MyBot : IChessBot
                 for (int i = thinkMoves.Length - 1; i >= 0; i--)
                 {
                     Move move = thinkMoves[i];
+
+                    // e2e4 for first move for white
+                    if (board.ZobristKey == 13227872743731781434 && move.RawValue == 14092)
+                        return move;
+
                     board.MakeMove(move);
                     thinkScores[i] = -AlphaBeta(-32001, 32001, thinkDepth - 1, false);
                     board.UndoMove(move);
