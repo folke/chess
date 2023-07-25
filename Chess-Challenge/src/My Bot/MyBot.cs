@@ -81,7 +81,10 @@ public class MyBot : IChessBot
 #endif
             }
         }
-        catch (TimeoutException) { }
+        catch (TimeoutException)
+        {
+            Array.Sort(thinkScores, thinkMoves);
+        }
 
         return thinkMoves.Last();
     }
