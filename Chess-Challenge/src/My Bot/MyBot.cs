@@ -127,8 +127,8 @@ public class MyBot : IChessBot
                 double score = -Search(
                     -beta,
                     -alpha,
-                    // TODO: extensions?
-                    board.IsInCheck()
+                    // Check extension, but only if we're not in quiescence search
+                    !quiescence && board.IsInCheck()
                         ? depthRemaining
                         : depthRemaining - 1,
                     depthFromRoot + 1,
