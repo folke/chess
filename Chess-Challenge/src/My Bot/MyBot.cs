@@ -146,10 +146,16 @@ public class MyBot : IChessBot
                 {
                     bestScore = score;
                     bestMove = move;
-                    if (!quiescence && !move.IsCapture)
+
+                    // Update killer moves
+                    int idx = 2 * board.PlyCount;
+                    if (
+                        !quiescence
+                        && !move.IsCapture
+                        && !move.IsPromotion
+                        && killerMoves[idx] != move
+                    )
                     {
-                        // Shift killer moves
-                        int idx = 2 * board.PlyCount;
                         killerMoves[idx + 1] = killerMoves[idx];
                         killerMoves[idx] = move;
                     }
