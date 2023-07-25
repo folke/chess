@@ -6,7 +6,7 @@ namespace ChessChallenge.Example
     // A simple bot that can spot mate in one, and always captures the most valuable piece it can.
     // Plays randomly otherwise.
 
-    public class EvilBot : IChessBot
+    public class EvilBot2 : IChessBot
     {
         private int maxDepth = 3;
         private int quiescenceDepth = 3;
