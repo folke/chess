@@ -91,7 +91,7 @@ public class DebugBot : MyBot, IChessBot
         return ret;
     }
 
-    protected override double AlphaBeta(double alpha, double beta, int depth, bool quiescence)
+    public override double AlphaBeta(double alpha, double beta, int depth, bool quiescence)
     {
         evals++;
         return base.AlphaBeta(alpha, beta, depth, quiescence);

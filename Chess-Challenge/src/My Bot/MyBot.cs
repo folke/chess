@@ -14,35 +14,21 @@ public class Transposition
 
 public class MyBot : IChessBot
 {
-    protected int maxDepth = 9,
+    public int maxDepth = 9,
         quiescenceDepth = 3,
         thinkDepth;
-    protected readonly int[] pesto = Unpack(pesto_packed);
-    protected readonly int[] pieceValues =
-        {
-            82,
-            337,
-            365,
-            477,
-            1025,
-            0,
-            94,
-            281,
-            297,
-            512,
-            936,
-            0
-        },
+    public readonly int[] pesto = Unpack(pesto_packed);
+    public readonly int[] pieceValues =  { 82, 337, 365, 477, 1025, 0, 94, 281, 297, 512, 936, 0 },
         gamephaseInc =  { 0, 1, 1, 2, 4, 0 };
-    protected Timer timer;
-    protected Board board;
-    protected double timeLimit;
-    protected readonly Dictionary<ulong, Transposition> transpositionTable = new();
-    protected Move[] killerMoves = new Move[600],
+    public Timer timer;
+    public Board board;
+    public double timeLimit;
+    public readonly Dictionary<ulong, Transposition> transpositionTable = new();
+    public Move[] killerMoves = new Move[600],
         thinkMoves;
-    protected double[] thinkScores;
+    public double[] thinkScores;
 #if DEBUG
-    protected Action OnDepth = () => { };
+    public Action OnDepth = () => { };
 #endif
 
     public Move Think(Board b, Timer t)
@@ -70,12 +56,7 @@ public class MyBot : IChessBot
                 {
                     Move move = thinkMoves[i];
                     board.MakeMove(move);
-                    thinkScores[i] = -AlphaBeta(
-                        double.NegativeInfinity,
-                        double.PositiveInfinity,
-                        thinkDepth - 1,
-                        false
-                    );
+                    thinkScores[i] = -AlphaBeta(-32001, 32001, thinkDepth - 1, false);
                     board.UndoMove(move);
                     if (thinkScores[i] > 9000)
                     {
@@ -97,7 +78,7 @@ public class MyBot : IChessBot
         return thinkMoves.Last();
     }
 
-    protected virtual double AlphaBeta(double alpha, double beta, int depth, bool quiescence)
+    public virtual double AlphaBeta(double alpha, double beta, int depth, bool quiescence)
     {
         if (timer.MillisecondsElapsedThisTurn >= timeLimit)
             throw new TimeoutException();
@@ -114,11 +95,11 @@ public class MyBot : IChessBot
         )
             return trans.Score;
 
-        double bestScore = double.NegativeInfinity;
+        double bestScore = -32002;
         if (board.IsDraw())
             return 0;
         if (board.IsInCheckmate())
-            return bestScore;
+            return board.PlyCount - 32000;
 
         if (quiescence)
         {
