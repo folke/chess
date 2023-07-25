@@ -5,4 +5,6 @@ dotnet_diagnostic.CS8602.severity = silent
 # CS8618: Non-nullable field must contain a non-null value when exiting constructor. Consider declaring as nullable.
 dotnet_diagnostic.CS8618.severity = silent
 dotnet_diagnostic.IDE0011.severity = none
+dotnet_diagnostic.IDE0055.severity = none
 dotnet_diagnostic.IDE0048.severity = none
+dotnet_diagnostic.CA1051.severity = none
