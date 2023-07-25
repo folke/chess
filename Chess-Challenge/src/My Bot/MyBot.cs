@@ -107,53 +107,56 @@ public class MyBot : IChessBot
             return trans.Score;
 
         double bestScore = -32002;
-        if (board.IsDraw())
-            return 0;
-        if (board.IsInCheckmate())
-            return board.PlyCount - 32000;
-
-        if (quiescence)
-        {
-            double standPat = EvaluateBoard();
-            if (depth == 0 || standPat >= beta)
-                return standPat;
-            bestScore = alpha = Math.Max(alpha, standPat);
-        }
-        else if (depth == 0)
-            return AlphaBeta(alpha, beta, quiescenceDepth - 1, true);
-
-        Move[] moves = GetMoves(quiescence);
-
         Move? bestMove = null;
-        foreach (Move move in moves)
-        {
-            board.MakeMove(move);
-            double score = -AlphaBeta(
-                -beta,
-                -alpha,
-                quiescence && board.IsInCheck() ? depth : depth - 1,
-                quiescence
-            );
-            board.UndoMove(move);
 
-            if (score >= beta)
+        if (board.IsDraw())
+            bestScore = 0;
+        else if (board.IsInCheckmate())
+            bestScore = board.PlyCount - 32000;
+        else
+        {
+            if (quiescence)
             {
-                bestScore = score;
-                bestMove = move;
-                break;
+                double standPat = EvaluateBoard();
+                if (depth == 0 || standPat >= beta)
+                    return standPat;
+                bestScore = alpha = Math.Max(alpha, standPat);
             }
-            if (score > bestScore)
+            else if (depth == 0)
+                return AlphaBeta(alpha, beta, quiescenceDepth - 1, true);
+
+            Move[] moves = GetMoves(quiescence);
+
+            foreach (Move move in moves)
             {
-                bestScore = score;
-                bestMove = move;
-                if (!quiescence && !move.IsCapture)
+                board.MakeMove(move);
+                double score = -AlphaBeta(
+                    -beta,
+                    -alpha,
+                    quiescence && board.IsInCheck() ? depth : depth - 1,
+                    quiescence
+                );
+                board.UndoMove(move);
+
+                if (score >= beta)
                 {
-                    // Shift killer moves
-                    int idx = 2 * board.PlyCount;
-                    killerMoves[idx + 1] = killerMoves[idx];
-                    killerMoves[idx] = move;
+                    bestScore = score;
+                    bestMove = move;
+                    break;
                 }
-                alpha = Math.Max(alpha, score);
+                if (score > bestScore)
+                {
+                    bestScore = score;
+                    bestMove = move;
+                    if (!quiescence && !move.IsCapture)
+                    {
+                        // Shift killer moves
+                        int idx = 2 * board.PlyCount;
+                        killerMoves[idx + 1] = killerMoves[idx];
+                        killerMoves[idx] = move;
+                    }
+                    alpha = Math.Max(alpha, score);
+                }
             }
         }
         if (!quiescence && (depth > (trans?.Depth ?? 0)))
