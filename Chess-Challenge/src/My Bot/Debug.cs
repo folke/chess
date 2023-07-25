@@ -7,15 +7,19 @@ public class DebugBot : MyBot, IChessBot
 {
     private readonly bool debug = true;
     protected int evals;
+    bool didInit = false;
 
-    public DebugBot()
+    public void Init()
     {
+      didInit = true;
         Console.WriteLine("DebugBot");
         new ChessTables().Generate();
     }
 
     public new Move Think(Board board, Timer timer)
     {
+      if (!didInit)
+        Init();
         if (!debug)
             return base.Think(board, timer);
         evals = 0;

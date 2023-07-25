@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 public class ChessTables
 {
@@ -27,17 +28,18 @@ public class ChessTables
     {
         List<int> pestoList = new();
         for (int i = 0; i < 6; i++)
+        {
             pestoList.AddRange(mg_pesto_table[i]);
-        for (int i = 0; i < 6; i++)
             pestoList.AddRange(eg_pesto_table[i]);
+        }
 
         int[] pesto = pestoList.ToArray();
         decimal[] packed = Pack(pesto);
 
         // write to console separated by commas
-        Console.WriteLine("packed: " + string.Join("M, ", packed));
+        Console.WriteLine("packed: " + string.Join("M, ", packed) + "M");
 
-        int[] unpacked = MyBot.Unpack(packed);
+        int[] unpacked = Unpack(packed);
 
         if (unpacked.Length < pesto.Length)
         {
@@ -62,20 +64,39 @@ public class ChessTables
         return packed;
     }
 
+    private static int[] Unpack(decimal[] pesto_packed)
+    {
+        int[] pesto;
+
+        pesto = pesto_packed
+            .SelectMany(x => decimal.GetBits(x).Take(3))
+            .SelectMany(BitConverter.GetBytes)
+            .Select((x, i) => (i < 128 ? 64 : 0) + (sbyte)x)
+            .ToArray();
+        pesto[128] = -167;
+        pesto[149] = 129;
+        return pesto;
+    }
+
     private static decimal[] Pack(int[] table)
     {
+        table = table.ToArray();
+        for (int i = 0; i < 128; i++)
+            table[i] -= 64;
         List<sbyte> byteList = new();
         for (int i = 0; i < table.Length; i++)
         {
             int val = table[i];
             if (val is < (-128) or > 127)
             {
-                byteList.Add(127);
-                byteList.Add((sbyte)(val >> 8));
-                byteList.Add((sbyte)(val & 0xFF));
+                int piece = (i / 64) % 6;
+                int square = i % 64;
+
+                Console.WriteLine(
+                    "idx: " + i + " val: " + val + " piece: " + piece + " square: " + square
+                );
             }
-            else
-                byteList.Add((sbyte)val);
+            byteList.Add((sbyte)val);
         }
         while (byteList.Count % 12 != 0) // We use 12 here, because we're going to use 96 bits (12 bytes) for the integer part.
             byteList.Add(0);
