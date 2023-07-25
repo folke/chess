@@ -16,20 +16,18 @@ public class MyBot : IChessBot
 {
     public int maxDepth = 9,
         quiescenceDepth = 3,
-        thinkDepth;
-    public readonly int[] pesto;
-    public readonly int[] pieceValues =  { 82, 337, 365, 477, 1025, 0, 94, 281, 297, 512, 936, 0 },
+        searchDepth;
+    public readonly int[] pesto,
+        pieceValues =  { 82, 337, 365, 477, 1025, 0, 94, 281, 297, 512, 936, 0 },
         gamephaseInc =  { 0, 1, 1, 2, 4, 0 };
     public Timer timer;
     public Board board;
-    public double timeLimit;
     public readonly Dictionary<ulong, Transposition> transpositionTable = new();
-    public Move[] killerMoves = new Move[600],
-        thinkMoves;
-    public double[] thinkScores;
-#if DEBUG
-    public Action OnDepth = () => { };
-#endif
+    public Move[] killerMoves = new Move[1000];
+    public Move thinkBestMove;
+    public double thinkBestScore,
+        iterationBestScore,
+        timeLimit;
 
     public Move Think(Board b, Timer t)
     {
@@ -48,63 +46,59 @@ public class MyBot : IChessBot
 #if DEBUG
         timeLimit = 100;
 #endif
+        thinkBestMove = Move.NullMove;
 
-        thinkMoves = GetMoves(false).Reverse().ToArray();
-        thinkScores = new double[thinkMoves.Length];
+        // e2e4 for first move for white
+        if (board.ZobristKey == 13227872743731781434)
+            return new Move("e2e4", board);
+
         try
         {
-            for (thinkDepth = 1; thinkDepth <= maxDepth; thinkDepth++)
+            for (searchDepth = 1; searchDepth <= maxDepth; searchDepth++)
             {
-                for (int i = thinkMoves.Length - 1; i >= 0; i--)
-                {
-                    Move move = thinkMoves[i];
-
-                    // e2e4 for first move for white
-                    if (board.ZobristKey == 13227872743731781434 && move.RawValue == 14092)
-                        return move;
-
-                    board.MakeMove(move);
-                    thinkScores[i] = -AlphaBeta(-32001, 32001, thinkDepth - 1, false);
-                    board.UndoMove(move);
-                    if (thinkScores[i] > 9000)
-                    {
-#if DEBUG
-                        Array.Sort(thinkScores, thinkMoves);
-                        OnDepth();
-#endif
-                        return move;
-                    }
-                }
-                Array.Sort(thinkScores, thinkMoves);
-#if DEBUG
-                OnDepth();
-#endif
+                if (
+                    (
+                        thinkBestScore = Search(
+                            iterationBestScore = -32001,
+                            32001,
+                            searchDepth,
+                            0,
+                            false
+                        )
+                    ) > 9000
+                )
+                    break;
             }
         }
-        catch (TimeoutException)
-        {
-            Array.Sort(thinkScores, thinkMoves);
-        }
+        catch (TimeoutException) { }
 
-        return thinkMoves.Last();
+        return thinkBestMove;
     }
 
-    public virtual double AlphaBeta(double alpha, double beta, int depth, bool quiescence)
+    public virtual double Search(
+        double alpha,
+        double beta,
+        int depthRemaining,
+        int depthFromRoot,
+        bool quiescence
+    )
     {
         if (timer.MillisecondsElapsedThisTurn >= timeLimit)
             throw new TimeoutException();
 
         // Check transposition table
-        Transposition? trans = transpositionTable.GetValueOrDefault(board.ZobristKey);
         if (
-            trans?.Depth >= depth
+            transpositionTable.TryGetValue(board.ZobristKey, out var trans)
+            && trans.Depth >= depthRemaining
             && (
                 (trans.Type == 0)
                 || (trans.Type == 1 && trans.Score <= alpha)
                 || (trans.Type == 2 && trans.Score >= beta)
             )
         )
+        {
             return trans.Score;
+        }
 
         double bestScore = -32002;
         Move? bestMove = null;
@@ -117,23 +111,27 @@ public class MyBot : IChessBot
         {
             if (quiescence)
             {
-                double standPat = EvaluateBoard();
-                if (depth == 0 || standPat >= beta)
+                double standPat = Evaluate();
+                if (depthRemaining == 0 || standPat >= beta)
                     return standPat;
                 bestScore = alpha = Math.Max(alpha, standPat);
             }
-            else if (depth == 0)
-                return AlphaBeta(alpha, beta, quiescenceDepth - 1, true);
+            else if (depthRemaining == 0)
+                return Search(alpha, beta, quiescenceDepth, depthFromRoot + 1, true);
 
-            Move[] moves = GetMoves(quiescence);
+            Move[] moves = GetMoves(quiescence, depthFromRoot == 0);
 
             foreach (Move move in moves)
             {
                 board.MakeMove(move);
-                double score = -AlphaBeta(
+                double score = -Search(
                     -beta,
                     -alpha,
-                    quiescence && board.IsInCheck() ? depth : depth - 1,
+                    // TODO: extensions?
+                    board.IsInCheck()
+                        ? depthRemaining
+                        : depthRemaining - 1,
+                    depthFromRoot + 1,
                     quiescence
                 );
                 board.UndoMove(move);
@@ -159,11 +157,17 @@ public class MyBot : IChessBot
                 }
             }
         }
-        if (!quiescence && (depth > (trans?.Depth ?? 0)))
+        if (depthFromRoot == 0 && bestScore > iterationBestScore)
+        {
+            iterationBestScore = bestScore;
+            thinkBestMove = (Move)bestMove;
+        }
+
+        if (!quiescence && (trans == null || depthRemaining >= trans.Depth))
             transpositionTable[board.ZobristKey] = new Transposition
             {
                 BestMove = bestMove,
-                Depth = depth,
+                Depth = depthRemaining,
                 Score = bestScore,
                 Type =
                     bestScore <= alpha
@@ -175,7 +179,7 @@ public class MyBot : IChessBot
         return bestScore;
     }
 
-    private double EvaluateBoard()
+    private double Evaluate()
     {
         int[] mg =  { 0, 0 },
             eg =  { 0, 0 };
@@ -203,7 +207,7 @@ public class MyBot : IChessBot
         return (mg[side] - mg[side ^ 1]) * factor + (eg[side] - eg[side ^ 1]) * (1 - factor);
     }
 
-    private Move[] GetMoves(bool capturesOnly)
+    private Move[] GetMoves(bool capturesOnly, bool root)
     {
         // Check if the position exists in the transposition table
         Move? bestMove = transpositionTable.GetValueOrDefault(board.ZobristKey)?.BestMove;
@@ -213,7 +217,8 @@ public class MyBot : IChessBot
             .GetLegalMoves(capturesOnly)
             .OrderByDescending(
                 m =>
-                    (m == bestMove ? 30000 : 0)
+                    (root && m == thinkBestMove ? 100000 : 0)
+                    + (m == bestMove ? 30000 : 0)
                     + (
                         m == killerMoves[2 * board.PlyCount]
                             ? 20000

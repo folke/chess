@@ -5,35 +5,31 @@ using ChessChallenge.API;
 
 public class DebugBot : MyBot, IChessBot
 {
-    private readonly bool debug = true;
+    private readonly bool debug = false;
     protected int evals;
     bool didInit = false;
 
     public void Init()
     {
-      didInit = true;
+        didInit = true;
         Console.WriteLine("DebugBot");
         new ChessTables().Generate();
     }
 
     public new Move Think(Board board, Timer timer)
     {
-      if (!didInit)
-        Init();
+        if (!didInit)
+            Init();
         if (!debug)
             return base.Think(board, timer);
         evals = 0;
         string fen = board.GetFenString();
         Write("fen: " + fen);
 
-        OnDepth = () =>
-            Write($"{thinkMoves.Last()} ({thinkScores.Last() / 100.0}) {evals}x {thinkDepth}");
-
         Move move = base.Think(board, timer);
         this.board = Board.CreateBoardFromFEN(fen);
         Write($"best move: {PrettyMove(move)}");
-        double score = thinkScores[thinkMoves.ToList().IndexOf(move)];
-        Write($"score: {score / 100.0}");
+        Write($"score: {thinkBestScore / 100.0}");
 
         double mem = GC.GetTotalMemory(false) / 1000000.0;
         Write($"mem: {mem} MB");
@@ -54,7 +50,7 @@ public class DebugBot : MyBot, IChessBot
         line.Add((move, PrettyMove(move)));
         board.MakeMove(move);
         Transposition? trans = transpositionTable.GetValueOrDefault(board.ZobristKey);
-        if (trans != null && trans.BestMove != null && line.Count < thinkDepth)
+        if (trans != null && trans.BestMove != null && line.Count < searchDepth)
         {
             BestLine((Move)trans.BestMove, line);
         }
@@ -95,9 +91,18 @@ public class DebugBot : MyBot, IChessBot
         return ret;
     }
 
-    public override double AlphaBeta(double alpha, double beta, int depth, bool quiescence)
+    public override double Search(
+        double alpha,
+        double beta,
+        int depthRemaining,
+        int depthFromRoot,
+        bool quiescence
+    )
     {
         evals++;
-        return base.AlphaBeta(alpha, beta, depth, quiescence);
+        double ret = base.Search(alpha, beta, depthRemaining, depthFromRoot, quiescence);
+        if (depthFromRoot == 0 && debug)
+            Write($"{thinkBestMove} ({thinkBestScore / 100.0}) {evals}x {searchDepth}");
+        return ret;
     }
 }
