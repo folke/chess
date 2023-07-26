@@ -94,7 +94,7 @@ public class MyBot : IChessBot
         if (ply <= 0)
         {
             double standPat = Evaluate();
-            if (ply <= -2 || standPat >= beta)
+            if (ply <= -3 || standPat >= beta)
                 return standPat;
             alpha = Math.Max(alpha, standPat);
             foreach (Move move in moves)

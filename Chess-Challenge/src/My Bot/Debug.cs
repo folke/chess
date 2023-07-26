@@ -19,6 +19,12 @@ public class DebugBot : MyBot, IChessBot
         new ChessTables().Generate();
     }
 
+    public static double TimeLimit(double timeLimit)
+    {
+        return 100;
+        return Enabled ? 10000 : timeLimit;
+    }
+
     public new Move Think(Board board, Timer timer)
     {
         if (!didInit)
