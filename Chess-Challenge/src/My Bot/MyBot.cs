@@ -67,41 +67,18 @@ public class MyBot : IChessBot
         return thinkBestMove;
     }
 
-    public virtual double Quiescence(double alpha, double beta, int depthRemaining = 100006)
-    {
-        double standPat = Evaluate();
-        if (depthRemaining == 0 || standPat >= beta)
-            return standPat;
-        alpha = Math.Max(alpha, standPat);
-        foreach (Move move in GetMoves(true, false))
-        {
-            board.MakeMove(move);
-            alpha = Math.Max(alpha, -Quiescence(-beta, -alpha, depthRemaining - 1));
-            board.UndoMove(move);
-            if (alpha >= beta)
-                return beta;
-        }
-        return alpha;
-    }
-
     public virtual double Search(double alpha, double beta, int depthRemaining, bool root)
     {
         if (timer.MillisecondsElapsedThisTurn >= timeLimit)
             throw new TimeoutException();
 
         double alphaOrig = alpha;
-
         Move? bestMove = null;
         // Check transposition table
         if (
             transpositionTable.TryGetValue(board.ZobristKey, out var trans)
             && !root
             && trans.Depth >= depthRemaining
-        /* && ( */
-        /*     (trans.Type == 0) */
-        /*     || (trans.Type == 1 && trans.Score <= alpha) */
-        /*     || (trans.Type == 2 && trans.Score >= beta) */
-        /* ) */
         )
         {
             if (trans.Type == 1) // Fail-low
@@ -111,11 +88,25 @@ public class MyBot : IChessBot
             if (trans.Type == 0 || alpha >= beta)
                 return trans.Score;
             bestMove = trans.BestMove;
-            /* return trans.Score; */
         }
 
-        if (depthRemaining == 0)
-            return Quiescence(alpha, beta);
+        // Negative ply count means we're in quiescence search
+        if (depthRemaining <= 0)
+        {
+            double standPat = Evaluate();
+            if (depthRemaining < -3 || standPat >= beta)
+                return standPat;
+            alpha = Math.Max(alpha, standPat);
+            foreach (Move move in GetMoves(true, false))
+            {
+                board.MakeMove(move);
+                alpha = Math.Max(alpha, -Search(-beta, -alpha, depthRemaining - 1, false));
+                board.UndoMove(move);
+                if (alpha >= beta)
+                    return beta;
+            }
+            return alpha;
+        }
 
         double bestScore = -32002;
         Move[] moves = GetMoves(false, root);
@@ -145,12 +136,6 @@ public class MyBot : IChessBot
                     thinkBestMove = move;
                 }
 
-                if (score >= beta)
-                {
-                    bestScore = score;
-                    bestMove = move;
-                    break;
-                }
                 if (score > bestScore)
                 {
                     bestScore = score;
@@ -163,6 +148,8 @@ public class MyBot : IChessBot
                         killerMoves[idx + 1] = killerMoves[idx];
                         killerMoves[idx] = move;
                     }
+                    if (score >= beta)
+                        break;
                     alpha = Math.Max(alpha, score);
                 }
             }
