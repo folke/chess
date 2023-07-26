@@ -11,7 +11,7 @@ public class MyBot : IChessBot
         public Move? BestMove;
         public int Depth;
         public double Score;
-        public int Type; // 0 = exact, 1 = lower bound, 2 = upper bound
+        public int Flag; // 0 = exact, 1 = lower bound, 2 = upper bound
     }
 
     public int maxDepth = 9,
@@ -67,40 +67,38 @@ public class MyBot : IChessBot
         return thinkBestMove;
     }
 
-    public virtual double Search(double alpha, double beta, int depthRemaining, bool root)
+    public virtual double Search(double alpha, double beta, int ply, bool root = false)
     {
         if (timer.MillisecondsElapsedThisTurn >= timeLimit)
             throw new TimeoutException();
 
         double alphaOrig = alpha;
-        Move? bestMove = null;
+        var trans = transpositionTable.GetValueOrDefault(board.ZobristKey);
+        var bestMove = trans?.BestMove;
+
         // Check transposition table
-        if (
-            transpositionTable.TryGetValue(board.ZobristKey, out var trans)
-            && !root
-            && trans.Depth >= depthRemaining
-        )
+        if (!root && trans?.Depth >= ply)
         {
-            if (trans.Type == 1) // Fail-low
+            if (trans.Flag == 1) // lower bound
                 alpha = Math.Max(alpha, trans.Score);
-            else if (trans.Type == 2) // Fail-high
+            else if (trans.Flag == 2) // upper bound
                 beta = Math.Min(beta, trans.Score);
-            if (trans.Type == 0 || alpha >= beta)
+            if (trans.Flag == 0 || alpha >= beta) // exact
                 return trans.Score;
             bestMove = trans.BestMove;
         }
 
         // Negative ply count means we're in quiescence search
-        if (depthRemaining <= 0)
+        if (ply <= 0)
         {
             double standPat = Evaluate();
-            if (depthRemaining < -3 || standPat >= beta)
+            if (ply < -3 || standPat >= beta)
                 return standPat;
             alpha = Math.Max(alpha, standPat);
             foreach (Move move in GetMoves(true, false))
             {
                 board.MakeMove(move);
-                alpha = Math.Max(alpha, -Search(-beta, -alpha, depthRemaining - 1, false));
+                alpha = Math.Max(alpha, -Search(-beta, -alpha, ply - 1));
                 board.UndoMove(move);
                 if (alpha >= beta)
                     return beta;
@@ -123,9 +121,8 @@ public class MyBot : IChessBot
                     -alpha,
                     // Check extension, but only if we're not in quiescence search
                     board.IsInCheck()
-                        ? depthRemaining
-                        : depthRemaining - 1,
-                    false
+                        ? ply
+                        : ply - 1
                 );
                 /* if (root && board.IsRepeatedPosition()) */
                 /*     score -= 50; */
@@ -155,13 +152,13 @@ public class MyBot : IChessBot
             }
         }
 
-        if (trans == null || depthRemaining >= trans.Depth)
+        if (trans == null || ply >= trans.Depth)
             transpositionTable[board.ZobristKey] = new Transposition
             {
                 BestMove = bestMove,
-                Depth = depthRemaining,
+                Depth = ply,
                 Score = bestScore,
-                Type =
+                Flag =
                     bestScore <= alphaOrig
                         ? 2
                         : bestScore >= beta
