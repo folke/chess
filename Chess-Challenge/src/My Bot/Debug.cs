@@ -5,7 +5,7 @@ using ChessChallenge.API;
 
 public class DebugBot : MyBot, IChessBot
 {
-    private readonly bool debug = false;
+    private readonly bool debug = true;
     protected int evals;
     bool didInit = false;
 
