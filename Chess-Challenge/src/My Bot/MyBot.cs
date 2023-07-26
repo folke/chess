@@ -124,8 +124,8 @@ public class MyBot : IChessBot
                         ? ply
                         : ply - 1
                 );
-                /* if (root && board.IsRepeatedPosition()) */
-                /*     score -= 50; */
+                if (root && board.IsRepeatedPosition())
+                    score -= 50;
                 board.UndoMove(move);
                 if (root && score > iterationBestScore)
                 {
