@@ -4,16 +4,16 @@ using System.Linq;
 using System.Numerics;
 using ChessChallenge.API;
 
-public class Transposition
-{
-    public Move? BestMove;
-    public int Depth;
-    public double Score;
-    public int Type; // 0 = exact, 1 = lower bound, 2 = upper bound
-}
-
 public class MyBot : IChessBot
 {
+    public class Transposition
+    {
+        public Move? BestMove;
+        public int Depth;
+        public double Score;
+        public int Type; // 0 = exact, 1 = lower bound, 2 = upper bound
+    }
+
     public int maxDepth = 9,
         searchDepth;
     public readonly int[] pesto,
@@ -67,16 +67,16 @@ public class MyBot : IChessBot
         return thinkBestMove;
     }
 
-    public double Quiescence(double alpha, double beta)
+    public virtual double Quiescence(double alpha, double beta, int depthRemaining = 100006)
     {
         double standPat = Evaluate();
-        if (standPat >= beta)
+        if (depthRemaining == 0 || standPat >= beta)
             return standPat;
         alpha = Math.Max(alpha, standPat);
         foreach (Move move in GetMoves(true, false))
         {
             board.MakeMove(move);
-            alpha = Math.Max(alpha, -Quiescence(-beta, -alpha));
+            alpha = Math.Max(alpha, -Quiescence(-beta, -alpha, depthRemaining - 1));
             board.UndoMove(move);
             if (alpha >= beta)
                 return beta;
@@ -89,33 +89,37 @@ public class MyBot : IChessBot
         if (timer.MillisecondsElapsedThisTurn >= timeLimit)
             throw new TimeoutException();
 
+        double alphaOrig = alpha;
+
+        Move? bestMove = null;
         // Check transposition table
         if (
             transpositionTable.TryGetValue(board.ZobristKey, out var trans)
+            && !root
             && trans.Depth >= depthRemaining
-            && (
-                (trans.Type == 0)
-                || (trans.Type == 1 && trans.Score <= alpha)
-                || (trans.Type == 2 && trans.Score >= beta)
-            )
+        /* && ( */
+        /*     (trans.Type == 0) */
+        /*     || (trans.Type == 1 && trans.Score <= alpha) */
+        /*     || (trans.Type == 2 && trans.Score >= beta) */
+        /* ) */
         )
         {
-            /* if (trans.Type == 1) // Fail-low */
-            /*     alpha = Math.Max(alpha, trans.Score); */
-            /* else if (trans.Type == 2) // Fail-high */
-            /*     beta = Math.Min(beta, trans.Score); */
-            /**/
-            /* if (trans.Type == 0 || alpha >= beta) */
-            /*     return trans.Score; */
-            return trans.Score;
+            if (trans.Type == 1) // Fail-low
+                alpha = Math.Max(alpha, trans.Score);
+            else if (trans.Type == 2) // Fail-high
+                beta = Math.Min(beta, trans.Score);
+            if (trans.Type == 0 || alpha >= beta)
+                return trans.Score;
+            bestMove = trans.BestMove;
+            /* return trans.Score; */
         }
 
         if (depthRemaining == 0)
             return Quiescence(alpha, beta);
 
         double bestScore = -32002;
-        Move? bestMove = null;
         Move[] moves = GetMoves(false, root);
+
         if (moves.Length == 0)
             bestScore = board.IsInCheck() ? -32000 + board.PlyCount : 0;
         else
@@ -132,6 +136,8 @@ public class MyBot : IChessBot
                         : depthRemaining - 1,
                     false
                 );
+                /* if (root && board.IsRepeatedPosition()) */
+                /*     score -= 50; */
                 board.UndoMove(move);
                 if (root && score > iterationBestScore)
                 {
@@ -169,10 +175,10 @@ public class MyBot : IChessBot
                 Depth = depthRemaining,
                 Score = bestScore,
                 Type =
-                    bestScore <= alpha
-                        ? 1
+                    bestScore <= alphaOrig
+                        ? 2
                         : bestScore >= beta
-                            ? 2
+                            ? 1
                             : 0
             };
         return bestScore;
@@ -193,7 +199,8 @@ public class MyBot : IChessBot
             eg[side] += pieceValues[p + 6] + pesto[sq + 64];
             gamePhase += gamephaseInc[p];
         }
-
+        // FIXME:
+        /* score_mg[turn] += 14; */
         /* tapered eval */
         int turn = Convert.ToInt32(board.IsWhiteToMove);
         double factor = Math.Min(1, gamePhase / 24.0);
@@ -203,8 +210,7 @@ public class MyBot : IChessBot
     private Move[] GetMoves(bool capturesOnly, bool root)
     {
         // Check if the position exists in the transposition table
-        Move? bestMove = transpositionTable.GetValueOrDefault(board.ZobristKey)?.BestMove;
-
+        var bestMove = transpositionTable.GetValueOrDefault(board.ZobristKey)?.BestMove;
         // Order the moves based on whether they match the best move from the transposition table, and then by your existing criteria
         return board
             .GetLegalMoves(capturesOnly)
