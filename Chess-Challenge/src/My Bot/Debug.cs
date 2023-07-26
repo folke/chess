@@ -91,16 +91,10 @@ public class DebugBot : MyBot, IChessBot
         return ret;
     }
 
-    public override double Search(
-        double alpha,
-        double beta,
-        int depthRemaining,
-        int depthFromRoot,
-        bool quiescence
-    )
+    public override double Search(double alpha, double beta, int depthRemaining, int depthFromRoot)
     {
         evals++;
-        double ret = base.Search(alpha, beta, depthRemaining, depthFromRoot, quiescence);
+        double ret = base.Search(alpha, beta, depthRemaining, depthFromRoot);
         if (depthFromRoot == 0 && debug)
             Write($"{thinkBestMove} ({thinkBestScore / 100.0}) {evals}x {searchDepth}");
         return ret;

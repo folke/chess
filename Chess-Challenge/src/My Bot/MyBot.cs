@@ -15,7 +15,6 @@ public class Transposition
 public class MyBot : IChessBot
 {
     public int maxDepth = 9,
-        quiescenceDepth = 3,
         searchDepth;
     public readonly int[] pesto,
         pieceValues =  { 82, 337, 365, 477, 1025, 0, 94, 281, 297, 512, 936, 0 },
@@ -56,16 +55,10 @@ public class MyBot : IChessBot
         {
             for (searchDepth = 1; searchDepth <= maxDepth; searchDepth++)
             {
+                // FIXME: when deepening use best scores as soon as possible
                 if (
-                    (
-                        thinkBestScore = Search(
-                            iterationBestScore = -32001,
-                            32001,
-                            searchDepth,
-                            0,
-                            false
-                        )
-                    ) > 9000
+                    (thinkBestScore = Search(iterationBestScore = -32001, 32001, searchDepth, 0))
+                    > 9000
                 )
                     break;
             }
@@ -75,13 +68,31 @@ public class MyBot : IChessBot
         return thinkBestMove;
     }
 
-    public virtual double Search(
-        double alpha,
-        double beta,
-        int depthRemaining,
-        int depthFromRoot,
-        bool quiescence
-    )
+    public double Quiescence(double alpha, double beta)
+    {
+        // I mean these checks here. Know that my evaluate function doesnt account for draws and checks
+        /* if (board.IsDraw()) */
+        /*     return 0; */
+        /* else if (board.IsInCheckmate()) */
+        /*     return board.PlyCount - 32000; */
+        /* if (timer.MillisecondsElapsedThisTurn >= timeLimit) */
+        /*     throw new TimeoutException(); */
+        double standPat = Evaluate();
+        if (standPat >= beta)
+            return standPat;
+        alpha = Math.Max(alpha, standPat);
+        foreach (Move move in GetMoves(true, false))
+        {
+            board.MakeMove(move);
+            alpha = Math.Max(alpha, -Quiescence(-beta, -alpha));
+            board.UndoMove(move);
+            if (alpha >= beta)
+                return beta;
+        }
+        return alpha;
+    }
+
+    public virtual double Search(double alpha, double beta, int depthRemaining, int depthFromRoot)
     {
         if (timer.MillisecondsElapsedThisTurn >= timeLimit)
             throw new TimeoutException();
@@ -97,30 +108,26 @@ public class MyBot : IChessBot
             )
         )
         {
+            /* if (trans.Type == 1) // Fail-low */
+            /*     alpha = Math.Max(alpha, trans.Score); */
+            /* else if (trans.Type == 2) // Fail-high */
+            /*     beta = Math.Min(beta, trans.Score); */
+            /**/
+            /* if (trans.Type == 0 || alpha >= beta) */
+            /*     return trans.Score; */
             return trans.Score;
         }
 
+        if (depthRemaining == 0)
+            return Quiescence(alpha, beta);
+
         double bestScore = -32002;
         Move? bestMove = null;
-
-        if (board.IsDraw())
-            bestScore = 0;
-        else if (board.IsInCheckmate())
-            bestScore = board.PlyCount - 32000;
+        Move[] moves = GetMoves(false, depthFromRoot == 0);
+        if (moves.Length == 0)
+            bestScore = board.IsInCheck() ? -32000 + board.PlyCount : 0;
         else
         {
-            if (quiescence)
-            {
-                double standPat = Evaluate();
-                if (depthRemaining == 0 || standPat >= beta)
-                    return standPat;
-                bestScore = alpha = Math.Max(alpha, standPat);
-            }
-            else if (depthRemaining == 0)
-                return Search(alpha, beta, quiescenceDepth, depthFromRoot + 1, true);
-
-            Move[] moves = GetMoves(quiescence, depthFromRoot == 0);
-
             foreach (Move move in moves)
             {
                 board.MakeMove(move);
@@ -128,13 +135,17 @@ public class MyBot : IChessBot
                     -beta,
                     -alpha,
                     // Check extension, but only if we're not in quiescence search
-                    !quiescence && board.IsInCheck()
+                    board.IsInCheck()
                         ? depthRemaining
                         : depthRemaining - 1,
-                    depthFromRoot + 1,
-                    quiescence
+                    depthFromRoot + 1
                 );
                 board.UndoMove(move);
+                if (depthFromRoot == 0 && score > iterationBestScore)
+                {
+                    iterationBestScore = score;
+                    thinkBestMove = move;
+                }
 
                 if (score >= beta)
                 {
@@ -149,12 +160,7 @@ public class MyBot : IChessBot
 
                     // Update killer moves
                     int idx = 2 * board.PlyCount;
-                    if (
-                        !quiescence
-                        && !move.IsCapture
-                        && !move.IsPromotion
-                        && killerMoves[idx] != move
-                    )
+                    if (!move.IsCapture && !move.IsPromotion && killerMoves[idx] != move)
                     {
                         killerMoves[idx + 1] = killerMoves[idx];
                         killerMoves[idx] = move;
@@ -163,13 +169,8 @@ public class MyBot : IChessBot
                 }
             }
         }
-        if (depthFromRoot == 0 && bestScore > iterationBestScore)
-        {
-            iterationBestScore = bestScore;
-            thinkBestMove = (Move)bestMove;
-        }
 
-        if (!quiescence && (trans == null || depthRemaining >= trans.Depth))
+        if (trans == null || depthRemaining >= trans.Depth)
             transpositionTable[board.ZobristKey] = new Transposition
             {
                 BestMove = bestMove,
