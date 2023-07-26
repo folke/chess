@@ -110,45 +110,44 @@ public class MyBot : IChessBot
         Move[] moves = GetMoves(false, root);
 
         if (moves.Length == 0)
-            bestScore = board.IsInCheck() ? -32000 + board.PlyCount : 0;
-        else
+            return board.IsInCheck() ? -32000 + board.PlyCount : 0;
+
+        foreach (Move move in moves)
         {
-            foreach (Move move in moves)
+            board.MakeMove(move);
+            double score = -Search(
+                -beta,
+                -alpha,
+                // Check extension, but only if we're not in quiescence search
+                board.IsInCheck()
+                    ? ply
+                    : ply - 1
+            );
+            if (root && board.IsRepeatedPosition())
+                score -= 50;
+            board.UndoMove(move);
+
+            if (root && score > iterationBestScore)
             {
-                board.MakeMove(move);
-                double score = -Search(
-                    -beta,
-                    -alpha,
-                    // Check extension, but only if we're not in quiescence search
-                    board.IsInCheck()
-                        ? ply
-                        : ply - 1
-                );
-                if (root && board.IsRepeatedPosition())
-                    score -= 50;
-                board.UndoMove(move);
-                if (root && score > iterationBestScore)
-                {
-                    iterationBestScore = score;
-                    thinkBestMove = move;
-                }
+                iterationBestScore = score;
+                thinkBestMove = move;
+            }
 
-                if (score > bestScore)
-                {
-                    bestScore = score;
-                    bestMove = move;
+            if (score > bestScore)
+            {
+                bestScore = score;
+                bestMove = move;
 
-                    // Update killer moves
-                    int idx = 2 * board.PlyCount;
-                    if (!move.IsCapture && !move.IsPromotion && killerMoves[idx] != move)
-                    {
-                        killerMoves[idx + 1] = killerMoves[idx];
-                        killerMoves[idx] = move;
-                    }
-                    if (score >= beta)
-                        break;
-                    alpha = Math.Max(alpha, score);
+                // Update killer moves
+                int idx = 2 * board.PlyCount;
+                if (!move.IsCapture && !move.IsPromotion && killerMoves[idx] != move)
+                {
+                    killerMoves[idx + 1] = killerMoves[idx];
+                    killerMoves[idx] = move;
                 }
+                if (score >= beta)
+                    break;
+                alpha = Math.Max(alpha, score);
             }
         }
 
@@ -183,10 +182,8 @@ public class MyBot : IChessBot
             eg[side] += pieceValues[p + 6] + pesto[sq + 64];
             gamePhase += gamephaseInc[p];
         }
-        // FIXME:
-        /* score_mg[turn] += 14; */
-        /* tapered eval */
         int turn = Convert.ToInt32(board.IsWhiteToMove);
+        /* mg[turn] += 14; // Add a bonus for having the move */
         double factor = Math.Min(1, gamePhase / 24.0);
         return (mg[turn] - mg[turn ^ 1]) * factor + (eg[turn] - eg[turn ^ 1]) * (1 - factor);
     }
