@@ -40,7 +40,13 @@ public class DebugBot : MyBot, IChessBot
         List<(Move, string)> list = BestLine(move);
         Write("best line: " + string.Join(" ", list.Select(x => x.Item2)));
         if (list.Last().Item2.Contains('#'))
-            Write("mate in " + (list.Count - 1) / 2);
+        {
+            int mateIn = (list.Count - 1) / 2;
+            if (mateIn == 0)
+                Write("checkmate!");
+            else
+                Write("mate in " + (list.Count - 1) / 2);
+        }
         return move;
     }
 
@@ -50,7 +56,7 @@ public class DebugBot : MyBot, IChessBot
         line.Add((move, PrettyMove(move)));
         board.MakeMove(move);
         Transposition? trans = transpositionTable.GetValueOrDefault(board.ZobristKey);
-        if (trans != null && trans.BestMove != null && line.Count < searchDepth)
+        if (trans?.BestMove != null && line.Count <= 16)
         {
             BestLine((Move)trans.BestMove, line);
         }

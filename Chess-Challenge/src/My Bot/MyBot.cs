@@ -69,13 +69,6 @@ public class MyBot : IChessBot
 
     public double Quiescence(double alpha, double beta)
     {
-        // I mean these checks here. Know that my evaluate function doesnt account for draws and checks
-        /* if (board.IsDraw()) */
-        /*     return 0; */
-        /* else if (board.IsInCheckmate()) */
-        /*     return board.PlyCount - 32000; */
-        /* if (timer.MillisecondsElapsedThisTurn >= timeLimit) */
-        /*     throw new TimeoutException(); */
         double standPat = Evaluate();
         if (standPat >= beta)
             return standPat;
