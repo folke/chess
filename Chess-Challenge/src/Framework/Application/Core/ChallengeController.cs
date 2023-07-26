@@ -213,9 +213,9 @@ namespace ChessChallenge.Application
         {
             return type switch
             {
-                PlayerType.MyBot => new ChessPlayer(new DebugBot(), type, GameDurationMilliseconds),
+                PlayerType.MyBot => new ChessPlayer(DebugBot.Enabled ? new DebugBot() : new MyBot(), type, GameDurationMilliseconds),
                 PlayerType.MyBot1 => new ChessPlayer(new MyBot1(), type, GameDurationMilliseconds),
-                PlayerType.BestBot => new ChessPlayer(new MyBot6(), type, GameDurationMilliseconds),
+                PlayerType.BestBot => new ChessPlayer(new MyBot7(), type, GameDurationMilliseconds),
                 PlayerType.EvilBot => new ChessPlayer(new EvilBot(), type, GameDurationMilliseconds),
                 PlayerType.LithiumBot => new ChessPlayer(new LithiumBot(), type, GameDurationMilliseconds),
                 PlayerType.NegamaxBot => new ChessPlayer(new NegamaxBot(), type, GameDurationMilliseconds),

@@ -6,6 +6,14 @@ using ChessChallenge.API;
 
 public class MyBot4 : IChessBot
 {
+    public class Transposition
+    {
+        public Move? BestMove;
+        public int Depth;
+        public double Score;
+        public int Type; // 0 = exact, 1 = lower bound, 2 = upper bound
+    }
+
     public int maxDepth = 9,
         quiescenceDepth = 3,
         searchDepth;

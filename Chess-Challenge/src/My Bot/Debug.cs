@@ -5,9 +5,12 @@ using ChessChallenge.API;
 
 public class DebugBot : MyBot, IChessBot
 {
-    private readonly bool debug = true;
-    protected int evals;
+    public const bool Enabled = false;
     bool didInit = false;
+
+    int statsNodes = 0;
+    int statsQNodes = 0;
+    int statsEvals = 0;
 
     public void Init()
     {
@@ -20,9 +23,11 @@ public class DebugBot : MyBot, IChessBot
     {
         if (!didInit)
             Init();
-        if (!debug)
-            return base.Think(board, timer);
-        evals = 0;
+
+        statsNodes = 0;
+        statsQNodes = 0;
+        statsEvals = 0;
+
         string fen = board.GetFenString();
         Write("fen: " + fen);
 
@@ -34,9 +39,16 @@ public class DebugBot : MyBot, IChessBot
         double mem = GC.GetTotalMemory(false) / 1000000.0;
         Write($"mem: {mem} MB");
 
+        Write($"nodes: {statsNodes}");
+        Write($"qnodes: {statsQNodes}");
+        Write($"evals: {statsEvals}");
+
         // evals per second
         int millis = timer.MillisecondsElapsedThisTurn;
-        Write($"evals: {(millis == 0 ? double.PositiveInfinity : evals / millis)}k/s");
+        Write(
+            $"total: {(millis == 0 ? double.PositiveInfinity : (statsNodes + statsQNodes) / millis)}n/s"
+        );
+
         List<(Move, string)> list = BestLine(move);
         Write("best line: " + string.Join(" ", list.Select(x => x.Item2)));
         if (list.Last().Item2.Contains('#'))
@@ -99,11 +111,14 @@ public class DebugBot : MyBot, IChessBot
 
     public override double Search(double alpha, double beta, int depthRemaining, bool root)
     {
-        evals++;
+        if (depthRemaining <= 0)
+            statsQNodes++;
+        else
+            statsNodes++;
         double ret = base.Search(alpha, beta, depthRemaining, root);
-        if (root && debug)
+        if (root)
             Write(
-                $"{thinkBestMove} ({Math.Round(thinkBestScore / 100.0, 2)}) {evals}x {searchDepth}"
+                $"{thinkBestMove} ({Math.Round(iterationBestScore / 100.0, 2)}) {statsNodes + statsQNodes}x {searchDepth}"
             );
         return ret;
     }

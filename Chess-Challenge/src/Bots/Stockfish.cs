@@ -14,7 +14,7 @@ public class StockfishBot : IChessBot
     /// <summary>
     /// The skill level of stockfish. Max is 20, min is 0.
     /// </summary>
-    private const int SKILL_LEVEL = 12;
+    private const int SKILL_LEVEL = 9;
 
     public StockfishBot()
     {
@@ -53,6 +53,7 @@ public class StockfishBot : IChessBot
         Ins().WriteLine($"position fen {board.GetFenString()}");
         var timeString = board.IsWhiteToMove ? "wtime" : "btime";
         Ins().WriteLine($"go {timeString} {timer.MillisecondsRemaining}");
+        /* Ins().WriteLine($"go movetime 100"); */
 
         string? line;
         Move? move = null;
