@@ -43,7 +43,7 @@ public class MyBot : IChessBot
                         : 0.1
             ); // calculate time limit for this move
 #if DEBUG
-        /* timeLimit = 100; */
+        timeLimit = 100;
 #endif
         thinkBestMove = Move.NullMove;
 
