@@ -43,7 +43,7 @@ public class MyBot : IChessBot
                         : 0.1
             ); // calculate time limit for this move
 #if DEBUG
-        timeLimit = 100;
+        timeLimit = DebugBot.TimeLimit(timeLimit);
 #endif
         thinkBestMove = Move.NullMove;
 
@@ -88,14 +88,16 @@ public class MyBot : IChessBot
             bestMove = trans.BestMove;
         }
 
+        Move[] moves = GetMoves(ply <= 0, root);
+
         // Negative ply count means we're in quiescence search
         if (ply <= 0)
         {
             double standPat = Evaluate();
-            if (ply < -3 || standPat >= beta)
+            if (ply <= -2 || standPat >= beta)
                 return standPat;
             alpha = Math.Max(alpha, standPat);
-            foreach (Move move in GetMoves(true, false))
+            foreach (Move move in moves)
             {
                 board.MakeMove(move);
                 alpha = Math.Max(alpha, -Search(-beta, -alpha, ply - 1));
@@ -107,7 +109,6 @@ public class MyBot : IChessBot
         }
 
         double bestScore = -32002;
-        Move[] moves = GetMoves(false, root);
 
         if (moves.Length == 0)
             return board.IsInCheck() ? -32000 + board.PlyCount : 0;
@@ -115,6 +116,7 @@ public class MyBot : IChessBot
         foreach (Move move in moves)
         {
             board.MakeMove(move);
+
             double score = -Search(
                 -beta,
                 -alpha,
@@ -173,15 +175,20 @@ public class MyBot : IChessBot
             eg =  { 0, 0 };
         int gamePhase = 0;
 
-        foreach (Piece piece in board.GetAllPieceLists().SelectMany(x => x))
+        for (int i = 0; i < 12; i++)
         {
-            int p = (int)piece.PieceType - 1,
-                side = Convert.ToInt32(piece.IsWhite),
-                sq = piece.Square.Index ^ (side * 56) + p * 128;
-            mg[side] += pieceValues[p] + pesto[sq];
-            eg[side] += pieceValues[p + 6] + pesto[sq + 64];
-            gamePhase += gamephaseInc[p];
+            int p = i % 6;
+            int side = i > 5 ? 1 : 0;
+            ulong bb = board.GetPieceBitboard((PieceType)(p + 1), Convert.ToBoolean(side));
+            while (bb > 0)
+            {
+                int sq = BitboardHelper.ClearAndGetIndexOfLSB(ref bb) ^ (side * 56) + p * 128;
+                mg[side] += pieceValues[p] + pesto[sq];
+                eg[side] += pieceValues[p + 6] + pesto[sq + 64];
+                gamePhase += gamephaseInc[p];
+            }
         }
+
         int turn = Convert.ToInt32(board.IsWhiteToMove);
         /* mg[turn] += 14; // Add a bonus for having the move */
         double factor = Math.Min(1, gamePhase / 24.0);
