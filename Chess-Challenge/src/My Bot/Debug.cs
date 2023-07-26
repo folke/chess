@@ -5,7 +5,7 @@ using ChessChallenge.API;
 
 public class DebugBot : MyBot, IChessBot
 {
-    private readonly bool debug = false;
+    private readonly bool debug = true;
     protected int evals;
     bool didInit = false;
 
@@ -29,7 +29,7 @@ public class DebugBot : MyBot, IChessBot
         Move move = base.Think(board, timer);
         this.board = Board.CreateBoardFromFEN(fen);
         Write($"best move: {PrettyMove(move)}");
-        Write($"score: {thinkBestScore / 100.0}");
+        Write($"score: {Math.Round(thinkBestScore / 100.0, 2)}");
 
         double mem = GC.GetTotalMemory(false) / 1000000.0;
         Write($"mem: {mem} MB");
@@ -91,12 +91,14 @@ public class DebugBot : MyBot, IChessBot
         return ret;
     }
 
-    public override double Search(double alpha, double beta, int depthRemaining, int depthFromRoot)
+    public override double Search(double alpha, double beta, int depthRemaining, bool root)
     {
         evals++;
-        double ret = base.Search(alpha, beta, depthRemaining, depthFromRoot);
-        if (depthFromRoot == 0 && debug)
-            Write($"{thinkBestMove} ({thinkBestScore / 100.0}) {evals}x {searchDepth}");
+        double ret = base.Search(alpha, beta, depthRemaining, root);
+        if (root && debug)
+            Write(
+                $"{thinkBestMove} ({Math.Round(thinkBestScore / 100.0, 2)}) {evals}x {searchDepth}"
+            );
         return ret;
     }
 }

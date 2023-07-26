@@ -43,7 +43,7 @@ public class MyBot : IChessBot
                         : 0.1
             ); // calculate time limit for this move
 #if DEBUG
-        timeLimit = 100;
+        /* timeLimit = 100; */
 #endif
         thinkBestMove = Move.NullMove;
 
@@ -55,9 +55,8 @@ public class MyBot : IChessBot
         {
             for (searchDepth = 1; searchDepth <= maxDepth; searchDepth++)
             {
-                // FIXME: when deepening use best scores as soon as possible
                 if (
-                    (thinkBestScore = Search(iterationBestScore = -32001, 32001, searchDepth, 0))
+                    (thinkBestScore = Search(iterationBestScore = -32001, 32001, searchDepth, true))
                     > 9000
                 )
                     break;
@@ -92,7 +91,7 @@ public class MyBot : IChessBot
         return alpha;
     }
 
-    public virtual double Search(double alpha, double beta, int depthRemaining, int depthFromRoot)
+    public virtual double Search(double alpha, double beta, int depthRemaining, bool root)
     {
         if (timer.MillisecondsElapsedThisTurn >= timeLimit)
             throw new TimeoutException();
@@ -123,7 +122,7 @@ public class MyBot : IChessBot
 
         double bestScore = -32002;
         Move? bestMove = null;
-        Move[] moves = GetMoves(false, depthFromRoot == 0);
+        Move[] moves = GetMoves(false, root);
         if (moves.Length == 0)
             bestScore = board.IsInCheck() ? -32000 + board.PlyCount : 0;
         else
@@ -138,10 +137,10 @@ public class MyBot : IChessBot
                     board.IsInCheck()
                         ? depthRemaining
                         : depthRemaining - 1,
-                    depthFromRoot + 1
+                    false
                 );
                 board.UndoMove(move);
-                if (depthFromRoot == 0 && score > iterationBestScore)
+                if (root && score > iterationBestScore)
                 {
                     iterationBestScore = score;
                     thinkBestMove = move;
@@ -195,23 +194,17 @@ public class MyBot : IChessBot
         foreach (Piece piece in board.GetAllPieceLists().SelectMany(x => x))
         {
             int p = (int)piece.PieceType - 1,
-                c = 1,
-                sq = piece.Square.Index;
-            if (piece.IsWhite)
-            {
-                sq ^= 56;
-                c = 0;
-            }
-            sq += p * 128;
-            mg[c] += pieceValues[p] + pesto[sq];
-            eg[c] += pieceValues[p + 6] + pesto[sq + 64];
+                side = Convert.ToInt32(piece.IsWhite),
+                sq = piece.Square.Index ^ (side * 56) + p * 128;
+            mg[side] += pieceValues[p] + pesto[sq];
+            eg[side] += pieceValues[p + 6] + pesto[sq + 64];
             gamePhase += gamephaseInc[p];
         }
 
         /* tapered eval */
-        int side = board.IsWhiteToMove ? 0 : 1;
+        int turn = Convert.ToInt32(board.IsWhiteToMove);
         double factor = Math.Min(1, gamePhase / 24.0);
-        return (mg[side] - mg[side ^ 1]) * factor + (eg[side] - eg[side ^ 1]) * (1 - factor);
+        return (mg[turn] - mg[turn ^ 1]) * factor + (eg[turn] - eg[turn ^ 1]) * (1 - factor);
     }
 
     private Move[] GetMoves(bool capturesOnly, bool root)
