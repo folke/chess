@@ -170,8 +170,8 @@ public class MyBot : IChessBot
 
         for (int i = 0; i < 12; i++)
         {
-            int p = i % 6;
-            int side = i > 5 ? 1 : 0;
+            int p = i % 6,
+                side = i / 6;
             ulong bb = board.GetPieceBitboard((PieceType)(p + 1), Convert.ToBoolean(side));
             while (bb > 0)
             {
@@ -196,25 +196,18 @@ public class MyBot : IChessBot
             Move m = moves[i];
 
             scores[i] =
-                -1
-                * (
-                    (m == bestMove ? 30000 : 0)
-                    + (
-                        m == killerMoves[2 * board.PlyCount]
-                            ? 20000
-                            : m == killerMoves[2 * board.PlyCount + 1]
-                                ? 10000
-                                : 0
-                    )
-                    + (
-                        m.IsCapture
-                            ? (
-                                pieceValues[(int)m.CapturePieceType - 1]
-                                - pieceValues[(int)m.MovePieceType - 1]
-                            ) * 10
-                            : 0
-                    )
-                );
+                m == bestMove
+                    ? -30000
+                    : m == killerMoves[2 * board.PlyCount]
+                        ? -20000
+                        : m == killerMoves[2 * board.PlyCount + 1]
+                            ? -10000
+                            : m.IsCapture
+                                ? (
+                                    pieceValues[(int)m.CapturePieceType - 1]
+                                    - pieceValues[(int)m.MovePieceType - 1]
+                                ) * -10
+                                : 0;
         }
         scores.Sort(moves);
     }
