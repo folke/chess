@@ -5,7 +5,7 @@ using ChessChallenge.API;
 
 public class DebugBot : MyBot, IChessBot
 {
-    public const bool Enabled = false;
+    public const bool Enabled = true;
     bool didInit = false;
 
     int statsNodes = 0;

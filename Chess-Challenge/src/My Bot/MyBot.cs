@@ -1,6 +1,6 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Linq;
+using System.Collections.Generic;
 using ChessChallenge.API;
 
 public class MyBot : IChessBot
@@ -64,10 +64,10 @@ public class MyBot : IChessBot
             throw new TimeoutException();
 
         double alphaOrig = alpha;
-        Transposition trans = tt.GetValueOrDefault(board.ZobristKey);
-        Move bestMove = trans.BestMove;
 
         // Check transposition table
+        Transposition trans = tt.GetValueOrDefault(board.ZobristKey);
+        Move bestMove = trans.BestMove;
         if (!root && trans.Depth >= ply && trans.Depth != 0)
         {
             if (trans.Flag == 1) // lower bound
@@ -78,13 +78,36 @@ public class MyBot : IChessBot
                 return trans.Score;
         }
 
+        // Get legal moves
         Span<Move> moves = stackalloc Move[256];
         board.GetLegalMovesNonAlloc(ref moves, ply <= 0);
+
+        // Early exit if we're in checkmate
         if (moves.Length == 0 && board.IsInCheckmate())
             return -32000 + board.PlyCount;
-        OrderMoves(ref moves, bestMove);
 
-        // Negative ply count means we're in quiescence search
+        // Move ordering
+        Span<double> scores = stackalloc double[moves.Length];
+        for (int i = 0; i < moves.Length; i++)
+        {
+            Move m = moves[i];
+            scores[i] =
+                m == bestMove
+                    ? -30000
+                    : m == killerMoves[2 * board.PlyCount]
+                        ? -20000
+                        : m == killerMoves[2 * board.PlyCount + 1]
+                            ? -10000
+                            : m.IsCapture
+                                ? (
+                                    pieceValues[(int)m.CapturePieceType - 1]
+                                    - pieceValues[(int)m.MovePieceType - 1]
+                                ) * -10
+                                : 0;
+        }
+        scores.Sort(moves);
+
+        // Quiescence search (negative ply)
         if (ply <= 0)
         {
             alpha = Math.Max(alpha, Evaluate());
@@ -101,6 +124,7 @@ public class MyBot : IChessBot
             return alpha;
         }
 
+        // Early exit if we're in stalemate
         if (moves.Length == 0)
             return 0;
 
@@ -118,8 +142,11 @@ public class MyBot : IChessBot
                     ? ply
                     : ply - 1
             );
+
+            // Avoid 3-fold repetition
             if (root && board.IsRepeatedPosition())
                 score -= 50;
+
             board.UndoMove(move);
 
             if (root && score > iterationBestScore)
@@ -146,7 +173,7 @@ public class MyBot : IChessBot
             }
         }
 
-        /* if (trans.Depth == 0 || ply >= trans.Depth) */
+        // Update transposition table
         tt[board.ZobristKey] = new Transposition
         {
             BestMove = bestMove,
@@ -186,30 +213,6 @@ public class MyBot : IChessBot
         /* mg[turn] += 14; // Add a bonus for having the move */
         double factor = Math.Min(1, gamePhase / 24.0);
         return (mg[turn] - mg[turn ^ 1]) * factor + (eg[turn] - eg[turn ^ 1]) * (1 - factor);
-    }
-
-    private void OrderMoves(ref Span<Move> moves, Move bestMove)
-    {
-        Span<double> scores = stackalloc double[moves.Length];
-        for (int i = 0; i < moves.Length; i++)
-        {
-            Move m = moves[i];
-
-            scores[i] =
-                m == bestMove
-                    ? -30000
-                    : m == killerMoves[2 * board.PlyCount]
-                        ? -20000
-                        : m == killerMoves[2 * board.PlyCount + 1]
-                            ? -10000
-                            : m.IsCapture
-                                ? (
-                                    pieceValues[(int)m.CapturePieceType - 1]
-                                    - pieceValues[(int)m.MovePieceType - 1]
-                                ) * -10
-                                : 0;
-        }
-        scores.Sort(moves);
     }
 
     public MyBot()
