@@ -166,20 +166,22 @@ public class MyBot : IChessBot
                 bestScore = score;
                 bestMove = move;
 
-                // Update killer moves
-                int idx = 2 * board.PlyCount;
-                if (!move.IsCapture && !move.IsPromotion && killerMoves[idx] != move)
-                {
-                    killerMoves[idx + 1] = killerMoves[idx];
-                    killerMoves[idx] = move;
-                }
                 if (score >= beta)
+                {
+                    // Update killer moves
+                    int idx = 2 * board.PlyCount;
+                    if (!move.IsCapture && !move.IsPromotion && killerMoves[idx] != move)
+                    {
+                        killerMoves[idx + 1] = killerMoves[idx];
+                        killerMoves[idx] = move;
+                    }
                     historyTable[
                         Convert.ToInt32(board.IsWhiteToMove),
                         bestMove.StartSquare.Index,
                         bestMove.TargetSquare.Index
                     ] += 1 << ply;
                     break;
+                }
                 alpha = Math.Max(alpha, score);
             }
         }
@@ -204,9 +206,10 @@ public class MyBot : IChessBot
     {
         int[] mg =  { 0, 0 },
             eg =  { 0, 0 };
-        int gamePhase = 0;
+        int gamePhase = 0,
+            i = -1;
 
-        for (int i = 0; i < 12; i++)
+        while (++i < 12)
         {
             int p = i % 6,
                 side = i / 6;
