@@ -165,6 +165,7 @@ public class MyBot : IChessBot
                             ? 1
                             : 0
             };
+        };
         return bestScore;
     }
 
@@ -194,17 +195,17 @@ public class MyBot : IChessBot
         return (mg[turn] - mg[turn ^ 1]) * factor + (eg[turn] - eg[turn ^ 1]) * (1 - factor);
     }
 
-    private Move[] GetMoves(bool capturesOnly, bool root)
+    private void OrderMoves(ref Span<Move> moves, Move bestMove)
     {
-        // Check if the position exists in the transposition table
-        var bestMove = transpositionTable.GetValueOrDefault(board.ZobristKey)?.BestMove;
-        // Order the moves based on whether they match the best move from the transposition table, and then by your existing criteria
-        return board
-            .GetLegalMoves(capturesOnly)
-            .OrderByDescending(
-                m =>
-                    (root && m == thinkBestMove ? 100000 : 0)
-                    + (m == bestMove ? 30000 : 0)
+        Span<double> scores = stackalloc double[moves.Length];
+        for (int i = 0; i < moves.Length; i++)
+        {
+            Move m = moves[i];
+
+            scores[i] =
+                -1
+                * (
+                    (m == bestMove ? 30000 : 0)
                     + (
                         m == killerMoves[2 * board.PlyCount]
                             ? 20000
@@ -220,8 +221,9 @@ public class MyBot : IChessBot
                             ) * 10
                             : 0
                     )
-            )
-            .ToArray();
+                );
+        }
+        scores.Sort(moves);
     }
 
     public MyBot()
