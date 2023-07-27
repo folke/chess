@@ -89,22 +89,19 @@ public class MyBot : IChessBot
 
         // Move ordering
         Span<double> scores = stackalloc double[moves.Length];
-        for (int i = 0; i < moves.Length; i++)
+        int m = 0;
+        foreach (Move move in moves)
         {
-            Move m = moves[i];
-            scores[i] =
-                m == bestMove
-                    ? -30000
-                    : m == killerMoves[2 * board.PlyCount]
-                        ? -20000
-                        : m == killerMoves[2 * board.PlyCount + 1]
-                            ? -10000
-                            : m.IsCapture
-                                ? (
-                                    pieceValues[(int)m.CapturePieceType - 1]
-                                    - pieceValues[(int)m.MovePieceType - 1]
-                                ) * -10
-                                : 0;
+            scores[m++] =
+                move == bestMove
+                    ? -80000
+                    : move.IsCapture
+                        ? -70000
+                            - pieceValues[(int)move.CapturePieceType - 1]
+                            + pieceValues[(int)move.MovePieceType - 1]
+                        : move == killerMoves[2 * board.PlyCount]
+                        || move == killerMoves[2 * board.PlyCount + 1]
+                            ? -60000
                             : -historyTable[
                                 Convert.ToInt32(board.IsWhiteToMove),
                                 move.StartSquare.Index,
@@ -150,8 +147,8 @@ public class MyBot : IChessBot
             );
 
             // Avoid 3-fold repetition
-            if (root && board.IsRepeatedPosition())
-                score -= 50;
+            /* if (root && board.IsRepeatedPosition()) */
+            /*     score -= 50; */
 
             board.UndoMove(move);
 
