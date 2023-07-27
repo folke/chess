@@ -25,6 +25,7 @@ public class MyBot : IChessBot
     public Move thinkBestMove;
     public double iterationBestScore,
         timeLimit;
+    public int[,,] historyTable = new int[2, 64, 64];
 
     public Move Think(Board b, Timer t)
     {
@@ -104,6 +105,11 @@ public class MyBot : IChessBot
                                     - pieceValues[(int)m.MovePieceType - 1]
                                 ) * -10
                                 : 0;
+                            : -historyTable[
+                                Convert.ToInt32(board.IsWhiteToMove),
+                                move.StartSquare.Index,
+                                move.TargetSquare.Index
+                            ];
         }
         scores.Sort(moves);
 
@@ -168,6 +174,11 @@ public class MyBot : IChessBot
                     killerMoves[idx] = move;
                 }
                 if (score >= beta)
+                    historyTable[
+                        Convert.ToInt32(board.IsWhiteToMove),
+                        bestMove.StartSquare.Index,
+                        bestMove.TargetSquare.Index
+                    ] += 1 << ply;
                     break;
                 alpha = Math.Max(alpha, score);
             }
