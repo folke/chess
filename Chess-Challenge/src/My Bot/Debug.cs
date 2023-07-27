@@ -75,7 +75,7 @@ public class DebugBot : MyBot, IChessBot
         line ??= new List<(Move, string)>();
         line.Add((move, PrettyMove(move)));
         board.MakeMove(move);
-        Transposition trans = transpositionTable.GetValueOrDefault(board.ZobristKey);
+        Transposition trans = tt.GetValueOrDefault(board.ZobristKey);
         if (trans.Depth != 0 && !trans.BestMove.IsNull && line.Count <= 16)
         {
             BestLine(trans.BestMove, line);

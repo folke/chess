@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using ChessChallenge.API;
 
-public class MyBot : IChessBot
+public class MyBot9 : IChessBot
 {
     public struct Transposition
     {
@@ -219,7 +219,7 @@ public class MyBot : IChessBot
         scores.Sort(moves);
     }
 
-    public MyBot()
+    public MyBot9()
     {
         pesto = pesto_packed
             .SelectMany(x => decimal.GetBits(x).Take(3))
