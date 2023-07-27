@@ -88,6 +88,8 @@ public class MyBot : IChessBot
         }
 
         Move[] moves = GetMoves(ply <= 0, root);
+        if (moves.Length == 0 && board.IsInCheckmate())
+            return -32000 + board.PlyCount;
 
         // Negative ply count means we're in quiescence search
         if (ply <= 0)
@@ -109,7 +111,6 @@ public class MyBot : IChessBot
         double bestScore = -32002;
 
         if (moves.Length == 0)
-            return board.IsInCheck() ? -32000 + board.PlyCount : 0;
 
         foreach (Move move in moves)
         {
