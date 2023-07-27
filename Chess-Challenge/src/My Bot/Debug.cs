@@ -11,6 +11,7 @@ public class DebugBot : MyBot, IChessBot
     int statsNodes = 0;
     int statsQNodes = 0;
     int statsEvals = 0;
+    double bestScore = 0;
 
     public void Init()
     {
@@ -21,8 +22,8 @@ public class DebugBot : MyBot, IChessBot
 
     public static double TimeLimit(double timeLimit)
     {
-        return 100;
-        return Enabled ? 10000 : timeLimit;
+        /* return 100; */
+        return Enabled ? 10000 : 100;
     }
 
     public new Move Think(Board board, Timer timer)
@@ -30,6 +31,7 @@ public class DebugBot : MyBot, IChessBot
         if (!didInit)
             Init();
 
+        bestScore = 0;
         statsNodes = 0;
         statsQNodes = 0;
         statsEvals = 0;
@@ -40,7 +42,7 @@ public class DebugBot : MyBot, IChessBot
         Move move = base.Think(board, timer);
         this.board = Board.CreateBoardFromFEN(fen);
         Write($"best move: {PrettyMove(move)}");
-        Write($"score: {Math.Round(thinkBestScore / 100.0, 2)}");
+        Write($"score: {Math.Round(iterationBestScore / 100.0, 2)}");
 
         double mem = GC.GetTotalMemory(false) / 1000000.0;
         Write($"mem: {mem} MB");
@@ -73,10 +75,10 @@ public class DebugBot : MyBot, IChessBot
         line ??= new List<(Move, string)>();
         line.Add((move, PrettyMove(move)));
         board.MakeMove(move);
-        Transposition? trans = transpositionTable.GetValueOrDefault(board.ZobristKey);
-        if (trans?.BestMove != null && line.Count <= 16)
+        Transposition trans = transpositionTable.GetValueOrDefault(board.ZobristKey);
+        if (trans.Depth != 0 && !trans.BestMove.IsNull && line.Count <= 16)
         {
-            BestLine((Move)trans.BestMove, line);
+            BestLine(trans.BestMove, line);
         }
         board.UndoMove(move);
 
@@ -115,17 +117,20 @@ public class DebugBot : MyBot, IChessBot
         return ret;
     }
 
-    public override double Search(double alpha, double beta, int depthRemaining, bool root)
+    public override double Search(double alpha, double beta, int ply, bool root)
     {
-        if (depthRemaining <= 0)
+        if (ply <= 0)
             statsQNodes++;
         else
             statsNodes++;
-        double ret = base.Search(alpha, beta, depthRemaining, root);
+        double ret = base.Search(alpha, beta, ply, root);
         if (root)
+        {
+            bestScore = iterationBestScore;
             Write(
                 $"{thinkBestMove} ({Math.Round(iterationBestScore / 100.0, 2)}) {statsNodes + statsQNodes}x {searchDepth}"
             );
+        }
         return ret;
     }
 }

@@ -1,14 +1,13 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Numerics;
 using ChessChallenge.API;
 
 public class MyBot : IChessBot
 {
-    public class Transposition
+    public struct Transposition
     {
-        public Move? BestMove;
+        public Move BestMove;
         public int Depth;
         public double Score;
         public int Flag; // 0 = exact, 1 = lower bound, 2 = upper bound
@@ -24,15 +23,14 @@ public class MyBot : IChessBot
     public readonly Dictionary<ulong, Transposition> transpositionTable = new();
     public Move[] killerMoves = new Move[1000];
     public Move thinkBestMove;
-    public double thinkBestScore,
-        iterationBestScore,
+    public double iterationBestScore,
         timeLimit;
 
     public Move Think(Board b, Timer t)
     {
         board = b;
         timer = t;
-        int pieces = BitOperations.PopCount(board.AllPiecesBitboard);
+        int pieces = BitboardHelper.GetNumberOfSetBits(board.AllPiecesBitboard);
         timeLimit =
             timer.MillisecondsRemaining
             * (
@@ -45,7 +43,6 @@ public class MyBot : IChessBot
 #if DEBUG
         timeLimit = DebugBot.TimeLimit(timeLimit);
 #endif
-        thinkBestMove = Move.NullMove;
 
         // e2e4 for first move for white
         if (board.ZobristKey == 13227872743731781434)
@@ -54,16 +51,10 @@ public class MyBot : IChessBot
         try
         {
             for (searchDepth = 1; searchDepth <= maxDepth; searchDepth++)
-            {
-                if (
-                    (thinkBestScore = Search(iterationBestScore = -32001, 32001, searchDepth, true))
-                    > 9000
-                )
+                if (Search(iterationBestScore = -32001, 32001, searchDepth, true) > 9000)
                     break;
-            }
         }
         catch (TimeoutException) { }
-
         return thinkBestMove;
     }
 
@@ -73,11 +64,11 @@ public class MyBot : IChessBot
             throw new TimeoutException();
 
         double alphaOrig = alpha;
-        var trans = transpositionTable.GetValueOrDefault(board.ZobristKey);
-        var bestMove = trans?.BestMove;
+        Transposition trans = transpositionTable.GetValueOrDefault(board.ZobristKey);
+        Move bestMove = trans.BestMove;
 
         // Check transposition table
-        if (!root && trans?.Depth >= ply)
+        if (!root && trans.Depth >= ply && trans.Depth != 0)
         {
             if (trans.Flag == 1) // lower bound
                 alpha = Math.Max(alpha, trans.Score);
@@ -87,9 +78,11 @@ public class MyBot : IChessBot
                 return trans.Score;
         }
 
-        Move[] moves = GetMoves(ply <= 0, root);
+        Span<Move> moves = stackalloc Move[256];
+        board.GetLegalMovesNonAlloc(ref moves, ply <= 0);
         if (moves.Length == 0 && board.IsInCheckmate())
             return -32000 + board.PlyCount;
+        OrderMoves(ref moves, bestMove);
 
         // Negative ply count means we're in quiescence search
         if (ply <= 0)
@@ -108,9 +101,10 @@ public class MyBot : IChessBot
             return alpha;
         }
 
-        double bestScore = -32002;
-
         if (moves.Length == 0)
+            return 0;
+
+        double bestScore = -32002;
 
         foreach (Move move in moves)
         {
@@ -152,19 +146,18 @@ public class MyBot : IChessBot
             }
         }
 
-        if (trans == null || ply >= trans.Depth)
-            transpositionTable[board.ZobristKey] = new Transposition
-            {
-                BestMove = bestMove,
-                Depth = ply,
-                Score = bestScore,
-                Flag =
-                    bestScore <= alphaOrig
-                        ? 2
-                        : bestScore >= beta
-                            ? 1
-                            : 0
-            };
+        /* if (trans.Depth == 0 || ply >= trans.Depth) */
+        transpositionTable[board.ZobristKey] = new Transposition
+        {
+            BestMove = bestMove,
+            Depth = ply,
+            Score = bestScore,
+            Flag =
+                bestScore <= alphaOrig
+                    ? 2
+                    : bestScore >= beta
+                        ? 1
+                        : 0
         };
         return bestScore;
     }
