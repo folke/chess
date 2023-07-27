@@ -85,7 +85,6 @@ public class MyBot : IChessBot
                 beta = Math.Min(beta, trans.Score);
             if (trans.Flag == 0 || alpha >= beta) // exact
                 return trans.Score;
-            bestMove = trans.BestMove;
         }
 
         Move[] moves = GetMoves(ply <= 0, root);
@@ -93,10 +92,9 @@ public class MyBot : IChessBot
         // Negative ply count means we're in quiescence search
         if (ply <= 0)
         {
-            double standPat = Evaluate();
-            if (ply <= -6 || standPat >= beta)
-                return standPat;
-            alpha = Math.Max(alpha, standPat);
+            alpha = Math.Max(alpha, Evaluate());
+            if (ply <= -6 || alpha >= beta)
+                return alpha;
             foreach (Move move in moves)
             {
                 board.MakeMove(move);
