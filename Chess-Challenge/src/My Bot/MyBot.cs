@@ -201,29 +201,29 @@ public class MyBot : IChessBot
 
     private double Evaluate()
     {
-        int[] mg =  { 0, 0 },
-            eg =  { 0, 0 };
-        int gamePhase = 0,
+        int mg = 0,
+            eg = 0,
+            phase = 0,
             i = -1;
 
         while (++i < 12)
         {
-            int p = i % 6,
-                side = i / 6;
-            ulong bb = board.GetPieceBitboard((PieceType)(p + 1), Convert.ToBoolean(side));
+            int p = i % 6;
+            ulong bb = board.GetPieceBitboard((PieceType)(p + 1), i >= 6);
             while (bb > 0)
             {
-                int sq = BitboardHelper.ClearAndGetIndexOfLSB(ref bb) ^ (side * 56) + p * 128;
-                mg[side] += pieceValues[p] + pesto[sq];
-                eg[side] += pieceValues[p + 6] + pesto[sq + 64];
-                gamePhase += gamephaseInc[p];
+                int sq = BitboardHelper.ClearAndGetIndexOfLSB(ref bb) ^ (i / 6 * 56) + p * 128;
+                mg += pieceValues[p] + pesto[sq];
+                eg += pieceValues[p + 6] + pesto[sq + 64];
+                phase += gamephaseInc[p];
+            }
+            if (i == 5)
+            {
+                mg = -mg;
+                eg = -eg;
             }
         }
-
-        int turn = Convert.ToInt32(board.IsWhiteToMove);
-        /* mg[turn] += 14; // Add a bonus for having the move */
-        double factor = Math.Min(1, gamePhase / 24.0);
-        return (mg[turn] - mg[turn ^ 1]) * factor + (eg[turn] - eg[turn ^ 1]) * (1 - factor);
+        return (mg * phase + eg * (24 - phase)) / 24.0 * (board.IsWhiteToMove ? 1 : -1);
     }
 
     public MyBot()
