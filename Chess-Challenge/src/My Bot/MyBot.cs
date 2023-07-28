@@ -8,9 +8,9 @@ public class MyBot : IChessBot
     public struct Transposition
     {
         public Move BestMove;
-        public int Depth;
         public double Score;
-        public int Flag; // 0 = exact, 1 = lower bound, 2 = upper bound
+        public int Depth,
+            Flag; // 0 = exact, 1 = lower bound, 2 = upper bound
     }
 
     public int maxDepth = 9,
@@ -21,10 +21,9 @@ public class MyBot : IChessBot
     public Timer timer;
     public Board board;
     public readonly Dictionary<ulong, Transposition> tt = new();
-    public Move[] killerMoves = new Move[1000];
+    public Move[,] killerMoves = new Move[500, 2];
     public Move thinkBestMove;
-    public double iterationBestScore,
-        timeLimit;
+    public double timeLimit;
     public int[,,] historyTable = new int[2, 64, 64];
 
     public Move Think(Board b, Timer t)
@@ -52,14 +51,14 @@ public class MyBot : IChessBot
         try
         {
             for (searchDepth = 1; searchDepth <= maxDepth; searchDepth++)
-                if (Search(iterationBestScore = -32001, 32001, searchDepth, true) > 9000)
+                if (Search(-32001, 32001, searchDepth, 0) > 9000)
                     break;
         }
         catch (TimeoutException) { }
         return thinkBestMove;
     }
 
-    public virtual double Search(double alpha, double beta, int ply, bool root = false)
+    public virtual double Search(double alpha, double beta, int depth, int ply)
     {
         if (timer.MillisecondsElapsedThisTurn >= timeLimit)
             throw new TimeoutException();
@@ -69,7 +68,7 @@ public class MyBot : IChessBot
         // Check transposition table
         Transposition trans = tt.GetValueOrDefault(board.ZobristKey);
         Move bestMove = trans.BestMove;
-        if (!root && trans.Depth >= ply && trans.Depth != 0)
+        if (ply > 0 && trans.Depth >= depth && trans.Depth > 0)
         {
             if (trans.Flag == 1) // lower bound
                 alpha = Math.Max(alpha, trans.Score);
@@ -81,14 +80,14 @@ public class MyBot : IChessBot
 
         // Get legal moves
         Span<Move> moves = stackalloc Move[256];
-        board.GetLegalMovesNonAlloc(ref moves, ply <= 0);
+        board.GetLegalMovesNonAlloc(ref moves, depth <= 0);
 
         // Early exit if we're in checkmate
         if (moves.Length == 0 && board.IsInCheckmate())
-            return -32000 + board.PlyCount;
+            return -32000 + ply;
 
         // Move ordering
-        Span<double> scores = stackalloc double[moves.Length];
+        Span<int> scores = stackalloc int[moves.Length];
         int m = 0;
         foreach (Move move in moves)
         {
@@ -99,8 +98,7 @@ public class MyBot : IChessBot
                         ? -70000
                             - pieceValues[(int)move.CapturePieceType - 1]
                             + pieceValues[(int)move.MovePieceType - 1]
-                        : move == killerMoves[2 * board.PlyCount]
-                        || move == killerMoves[2 * board.PlyCount + 1]
+                        : killerMoves[ply, 0] == move || killerMoves[ply, 1] == move
                             ? -60000
                             : -historyTable[
                                 Convert.ToInt32(board.IsWhiteToMove),
@@ -110,16 +108,16 @@ public class MyBot : IChessBot
         }
         scores.Sort(moves);
 
-        // Quiescence search (negative ply)
-        if (ply <= 0)
+        // Quiescence search (negative depth)
+        if (depth <= 0)
         {
             alpha = Math.Max(alpha, Evaluate());
-            if (ply <= -6 || alpha >= beta)
+            if (depth <= -6 || alpha >= beta)
                 return alpha;
             foreach (Move move in moves)
             {
                 board.MakeMove(move);
-                alpha = Math.Max(alpha, -Search(-beta, -alpha, ply - 1));
+                alpha = Math.Max(alpha, -Search(-beta, -alpha, depth - 1, ply + 1));
                 board.UndoMove(move);
                 if (alpha >= beta)
                     return beta;
@@ -142,8 +140,9 @@ public class MyBot : IChessBot
                 -alpha,
                 // Check extension, but only if we're not in quiescence search
                 board.IsInCheck()
-                    ? ply
-                    : ply - 1
+                    ? depth
+                    : depth - 1,
+                ply + 1
             );
 
             // Avoid 3-fold repetition
@@ -152,31 +151,32 @@ public class MyBot : IChessBot
 
             board.UndoMove(move);
 
-            if (root && score > iterationBestScore)
-            {
-                iterationBestScore = score;
-                thinkBestMove = move;
-            }
-
             if (score > bestScore)
             {
                 bestScore = score;
                 bestMove = move;
 
+                if (ply == 0)
+                    thinkBestMove = move;
+
                 if (score >= beta)
                 {
                     // Update killer moves
-                    int idx = 2 * board.PlyCount;
-                    if (!move.IsCapture && !move.IsPromotion && killerMoves[idx] != move)
+                    if (
+                        !move.IsCapture
+                        && !move.IsPromotion
+                        && killerMoves[ply, 0] != move
+                        && killerMoves[ply, 1] != move
+                    )
                     {
-                        killerMoves[idx + 1] = killerMoves[idx];
-                        killerMoves[idx] = move;
+                        killerMoves[ply, 1] = killerMoves[ply, 0];
+                        killerMoves[ply, 0] = move;
                     }
                     historyTable[
                         Convert.ToInt32(board.IsWhiteToMove),
                         bestMove.StartSquare.Index,
                         bestMove.TargetSquare.Index
-                    ] += 1 << ply;
+                    ] += 1 << depth;
                     break;
                 }
                 alpha = Math.Max(alpha, score);
@@ -187,7 +187,7 @@ public class MyBot : IChessBot
         tt[board.ZobristKey] = new Transposition
         {
             BestMove = bestMove,
-            Depth = ply,
+            Depth = depth,
             Score = bestScore,
             Flag =
                 bestScore <= alphaOrig
