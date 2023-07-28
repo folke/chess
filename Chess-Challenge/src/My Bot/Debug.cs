@@ -1,17 +1,19 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using ChessChallenge.API;
 
 public class DebugBot : MyBot, IChessBot
 {
-    public const bool Enabled = true;
+    public const bool Enabled = false;
     bool didInit = false;
 
     int statsNodes = 0;
     int statsQNodes = 0;
     int statsEvals = 0;
     double bestScore = 0;
+    int[] statsSearch;
 
     public void Init()
     {
@@ -22,6 +24,7 @@ public class DebugBot : MyBot, IChessBot
 
     public static double TimeLimit(double timeLimit)
     {
+        /* return timeLimit; */
         /* return 100; */
         return Enabled ? 10000 : 100;
     }
@@ -31,42 +34,54 @@ public class DebugBot : MyBot, IChessBot
         if (!didInit)
             Init();
 
+        statsSearch = new int[maxDepth * 2 + 16];
         bestScore = 0;
         statsNodes = 0;
         statsQNodes = 0;
         statsEvals = 0;
 
         string fen = board.GetFenString();
-        Write("fen: " + fen);
+        WriteLine("fen: " + fen);
 
         Move move = base.Think(board, timer);
         this.board = Board.CreateBoardFromFEN(fen);
-        Write($"best move: {PrettyMove(move)}");
-        Write($"score: {Math.Round(iterationBestScore / 100.0, 2)}");
+        List<(Move, string)> list = BestLine(move);
+
+        int mateIn = list.Last().Item2.Contains('#') ? (list.Count + 1) / 2 : -1;
+        string score = mateIn == -1 ? Num(bestScore / 100.0, 2) : "#" + mateIn;
+
+        WriteLine(
+            $"best: {PrettyMove(move)} ({score})",
+            mateIn >= 0
+                ? ConsoleColor.Red
+                : bestScore > 0
+                    ? ConsoleColor.Green
+                    : ConsoleColor.Yellow
+        );
 
         double mem = GC.GetTotalMemory(false) / 1000000.0;
-        Write($"mem: {mem} MB");
+        WriteLine($"mem: {Num(mem)} MB");
 
-        Write($"nodes: {statsNodes}");
-        Write($"qnodes: {statsQNodes}");
-        Write($"evals: {statsEvals}");
+        WriteLine(
+            $"nodes: {Num(statsNodes + statsQNodes)}, search: {Num(statsNodes)}, qsearch: {Num(statsQNodes)}"
+        );
 
         // evals per second
         int millis = timer.MillisecondsElapsedThisTurn;
-        Write(
-            $"total: {(millis == 0 ? double.PositiveInfinity : (statsNodes + statsQNodes) / millis)}n/s"
+        WriteLine(
+            $"speed: {Num(millis == 0 ? double.PositiveInfinity : (statsNodes + statsQNodes) / millis)}k nodes/s"
         );
 
-        List<(Move, string)> list = BestLine(move);
-        Write("best line: " + string.Join(" ", list.Select(x => x.Item2)));
-        if (list.Last().Item2.Contains('#'))
-        {
-            int mateIn = (list.Count - 1) / 2;
-            if (mateIn == 0)
-                Write("checkmate!");
-            else
-                Write("mate in " + (list.Count - 1) / 2);
-        }
+        WriteLine("best line: " + string.Join(" ", list.Select(x => x.Item2)));
+
+        // print search stats
+        /* Write("search stats:"); */
+        /* for (int i = 0; i < statsSearch.Length; i++) */
+        /* { */
+        /*     if (statsSearch[i] == 0) */
+        /*         continue; */
+        /*     Write($"{i - 16}: {statsSearch[i]}"); */
+        /* } */
         return move;
     }
 
@@ -85,9 +100,19 @@ public class DebugBot : MyBot, IChessBot
         return line;
     }
 
-    public static void Write(string s)
+    public static void WriteLine(string s, ConsoleColor color = ConsoleColor.White)
     {
-        Console.WriteLine("[MyBot] " + s);
+        Write("[Zypher] ", ConsoleColor.Blue);
+        Write(s, color);
+        Console.WriteLine();
+    }
+
+    public static void Write(string s, ConsoleColor color = ConsoleColor.White)
+    {
+        Console.ForegroundColor = ConsoleColor.Blue;
+        Console.ForegroundColor = color;
+        Console.Write(s);
+        Console.ResetColor();
     }
 
     public string PrettyMove(Move move)
@@ -117,18 +142,31 @@ public class DebugBot : MyBot, IChessBot
         return ret;
     }
 
-    public override double Search(double alpha, double beta, int ply, bool root)
+    public static string Num(double value, int decimals = 0)
     {
-        if (ply <= 0)
+        return value == double.PositiveInfinity
+            ? "∞"
+            : value == double.NegativeInfinity
+                ? "-∞"
+                : value.ToString("N" + decimals, CultureInfo.InvariantCulture);
+    }
+
+    public override double Search(double alpha, double beta, int depth, int ply)
+    {
+        int idx = searchDepth + 16;
+
+        statsSearch[idx]++;
+
+        if (depth <= 0)
             statsQNodes++;
         else
             statsNodes++;
-        double ret = base.Search(alpha, beta, ply, root);
-        if (root)
+        double ret = base.Search(alpha, beta, depth, ply);
+        if (ply == 0)
         {
-            bestScore = iterationBestScore;
-            Write(
-                $"{thinkBestMove} ({Math.Round(iterationBestScore / 100.0, 2)}) {statsNodes + statsQNodes}x {searchDepth}"
+            bestScore = ret;
+            WriteLine(
+                $"{searchDepth}: {PrettyMove(thinkBestMove), -5} x{Num(statsNodes + statsQNodes), -10} ({Num(ret / 100.0, 2), 6})"
             );
         }
         return ret;

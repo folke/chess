@@ -14,7 +14,7 @@ public class StockfishBot : IChessBot
     /// <summary>
     /// The skill level of stockfish. Max is 20, min is 0.
     /// </summary>
-    private const int SKILL_LEVEL = 9;
+    private const int SKILL_LEVEL = 8;
 
     public StockfishBot()
     {
