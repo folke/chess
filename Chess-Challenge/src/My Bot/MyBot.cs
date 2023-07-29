@@ -86,6 +86,16 @@ public class MyBot : IChessBot
         if (moves.Length == 0 && board.IsInCheckmate())
             return -32000 + ply;
 
+        var DoSearch = (int delta) => -Search(-beta, -alpha, depth + delta, ply + 1);
+        // Null move pruning
+        if (depth > 2 && ply > 0 && board.TrySkipTurn())
+        {
+            double score = DoSearch(-3);
+            board.UndoSkipTurn();
+            if (score >= beta)
+                return score; // or return score if you are using fail-soft
+        }
+
         // Move ordering
         Span<int> scores = stackalloc int[moves.Length];
         int m = 0;
