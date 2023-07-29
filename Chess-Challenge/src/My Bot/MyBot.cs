@@ -6,6 +6,7 @@ using ChessChallenge.API;
 // TODO:
 // - [ ] experiment with maxDepth > 9
 // - [ ] determine correct 32000 values (and format them with _)
+// - [ ] get oproper game phase from evaluate for time management and skipping NMP
 
 public class MyBot : IChessBot
 {
@@ -70,6 +71,8 @@ public class MyBot : IChessBot
         // Quiescence search (negative depth)
         bool quiescence = depth <= 0,
             root = ply == 0;
+        int m = 0,
+            nextPly = ply + 1;
 
         // Check transposition table
         Transposition trans = tt.GetValueOrDefault(board.ZobristKey);
@@ -99,12 +102,10 @@ public class MyBot : IChessBot
         if (quiescence && (bestScore = alpha = Math.Max(alpha, Evaluate())) >= beta)
             return alpha;
 
-        var DoSearch = (int delta) => -Search(-beta, -alpha, depth + delta, ply + 1);
-
         // Null move pruning
         if (depth > 2 && !root && board.TrySkipTurn())
         {
-            score = -Search(-beta, -beta + 1, depth -3, ply + 1);
+            score = -Search(-beta, -beta + 1, depth - 3, nextPly);
             board.UndoSkipTurn();
             if (score >= beta)
                 return score; // or return score if you are using fail-soft
@@ -112,7 +113,6 @@ public class MyBot : IChessBot
 
         // Move ordering
         Span<int> scores = stackalloc int[moves.Length];
-        int m = 0;
         foreach (Move move in moves)
         {
             scores[m++] =
@@ -137,20 +137,18 @@ public class MyBot : IChessBot
         {
             board.MakeMove(move);
 
-            score = -Search(-beta, -alpha, depth + (board.IsInCheck() ? 0 : -1), ply + 1);
+            // Calculate check extension and late move reduction
+            int delta = board.IsInCheck()
+                ? 0
+                : m >= 3 && depth >= 3 && !move.IsCapture
+                    ? -2
+                    : -1;
+            m++;
 
-            /* // Calculate check extension and late move reduction */
-            /* int delta = board.IsInCheck() */
-            /*     ? 0 */
-            /*     : m >= 3 && depth >= 3 && !move.IsCapture */
-            /*         ? -2 */
-            /*         : -1; */
-            /* m++; */
-            /**/
-            /* score = DoSearch(delta); */
-            /* // do full depth search on fail high when doing LMR */
-            /* if (delta == -2 && score > alpha) */
-            /*     score = DoSearch(-1); */
+            score = -Search(-beta, -alpha, depth + delta, nextPly);
+            // do full depth search on fail high when doing LMR
+            if (delta == -2 && score > alpha)
+                score = -Search(-beta, -alpha, depth - 1, nextPly);
 
             // Avoid 3-fold repetition
             if (root && board.IsRepeatedPosition())
