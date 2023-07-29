@@ -146,8 +146,8 @@ public class MyBot : IChessBot
             );
 
             // Avoid 3-fold repetition
-            /* if (root && board.IsRepeatedPosition()) */
-            /*     score -= 50; */
+            if (ply == 0 && board.IsRepeatedPosition())
+                score -= 50;
 
             board.UndoMove(move);
 

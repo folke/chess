@@ -34,7 +34,7 @@ public class DebugBot : MyBot, IChessBot
         if (!didInit)
             Init();
 
-        statsSearch = new int[maxDepth * 2 + 16];
+        statsSearch = new int[50 * 2 + 16];
         bestScore = 0;
         statsNodes = 0;
         statsQNodes = 0;
@@ -157,6 +157,8 @@ public class DebugBot : MyBot, IChessBot
 
         statsSearch[idx]++;
 
+        int nodesBefore = statsNodes + statsQNodes;
+
         if (depth <= 0)
             statsQNodes++;
         else
@@ -165,8 +167,10 @@ public class DebugBot : MyBot, IChessBot
         if (ply == 0)
         {
             bestScore = ret;
+            double branchingFactor = (statsNodes + statsQNodes) / (double)nodesBefore;
+
             WriteLine(
-                $"{searchDepth}: {PrettyMove(thinkBestMove), -5} x{Num(statsNodes + statsQNodes), -10} ({Num(ret / 100.0, 2), 6})"
+                $"{searchDepth}: {PrettyMove(thinkBestMove), -5} {Num(statsNodes + statsQNodes), -10} $ {Num(ret / 100.0, 2), -6} {Num(branchingFactor, 2)}"
             );
         }
         return ret;
