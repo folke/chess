@@ -13,8 +13,7 @@ public class MyBot : IChessBot
             Flag; // 0 = exact, 1 = lower bound, 2 = upper bound
     }
 
-    public int maxDepth = 9,
-        searchDepth;
+    public int searchDepth;
     public readonly int[] pesto,
         pieceValues =  { 82, 337, 365, 477, 1025, 0, 94, 281, 297, 512, 936, 0 },
         gamephaseInc =  { 0, 1, 1, 2, 4, 0 };
@@ -50,7 +49,7 @@ public class MyBot : IChessBot
 
         try
         {
-            for (searchDepth = 1; searchDepth <= maxDepth; searchDepth++)
+            for (searchDepth = 1; searchDepth <= 9; searchDepth++)
                 if (Search(-32001, 32001, searchDepth, 0) > 9000)
                     break;
         }
