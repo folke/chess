@@ -43,9 +43,7 @@ public class MyBot : IChessBot
                         ? 0.05
                         : 0.1
             ); // calculate time limit for this move
-#if DEBUG
-        timeLimit = DebugBot.TimeLimit(timeLimit);
-#endif
+        timeLimit = DebugBot.TimeLimit(timeLimit); // #DEBUG
 
         // e2e4 for first move for white
         if (board.ZobristKey == 13227872743731781434)
