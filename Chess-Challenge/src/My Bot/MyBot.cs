@@ -48,7 +48,7 @@ public class MyBot : IChessBot
 
         try
         {
-            for (searchDepth = 1; searchDepth <= 9; searchDepth++)
+            for (searchDepth = 1; searchDepth <= 50; searchDepth++)
                 if (Search(-32001, 32001, searchDepth, 0) > 9000)
                     break;
         }
