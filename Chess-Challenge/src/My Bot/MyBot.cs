@@ -18,7 +18,9 @@ public class MyBot : IChessBot
             Flag; // 0 = exact, 1 = lower bound, 2 = upper bound
     }
 
-    public int searchDepth;
+    public int searchDepth,
+        phase,
+        gamePhase;
     public readonly int[] pesto,
         pieceValues =  { 82, 337, 365, 477, 1025, 0, 94, 281, 297, 512, 936, 0 },
         gamephaseInc =  { 0, 1, 1, 2, 4, 0 };
@@ -34,16 +36,10 @@ public class MyBot : IChessBot
     {
         board = b;
         timer = t;
-        int pieces = BitboardHelper.GetNumberOfSetBits(board.AllPiecesBitboard);
-        timeLimit =
-            timer.MillisecondsRemaining
-            * (
-                pieces > 26
-                    ? 0.01
-                    : pieces > 12
-                        ? 0.05
-                        : 0.1
-            ); // calculate time limit for this move
+        Evaluate();
+        gamePhase = phase;
+
+        timeLimit = timer.MillisecondsRemaining / (gamePhase == 24 ? 60.0 : 30.0);
         timeLimit = DebugBot.TimeLimit(timeLimit); // #DEBUG
 
         // e2e4 for first move for white
@@ -210,8 +206,8 @@ public class MyBot : IChessBot
     {
         int mg = 0,
             eg = 0,
-            phase = 0,
             i = -1;
+        phase = 0;
 
         while (++i < 12)
         {
