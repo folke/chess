@@ -112,7 +112,7 @@ public class MyBot : IChessBot
         if (depth <= 0)
         {
             alpha = Math.Max(alpha, Evaluate());
-            if (depth <= -6 || alpha >= beta)
+            if (alpha >= beta)
                 return alpha;
             foreach (Move move in moves)
             {
