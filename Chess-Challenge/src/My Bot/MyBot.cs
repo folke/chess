@@ -3,6 +3,10 @@ using System.Linq;
 using System.Collections.Generic;
 using ChessChallenge.API;
 
+// TODO:
+// - [ ] experiment with maxDepth > 9
+// - [ ] determine correct 32000 values (and format them with _)
+
 public class MyBot : IChessBot
 {
     public struct Transposition
@@ -62,12 +66,17 @@ public class MyBot : IChessBot
         if (timer.MillisecondsElapsedThisTurn >= timeLimit)
             throw new TimeoutException();
 
-        double alphaOrig = alpha;
+        double alphaOrig = alpha,
+            bestScore = -32000,
+            score;
+        // Quiescence search (negative depth)
+        bool quiescence = depth <= 0,
+            root = ply == 0;
 
         // Check transposition table
         Transposition trans = tt.GetValueOrDefault(board.ZobristKey);
         Move bestMove = trans.BestMove;
-        if (ply > 0 && trans.Depth >= depth && trans.Depth > 0)
+        if (!root && trans.Depth >= depth && trans.Depth > 0)
         {
             if (trans.Flag == 1) // lower bound
                 alpha = Math.Max(alpha, trans.Score);
@@ -79,17 +88,25 @@ public class MyBot : IChessBot
 
         // Get legal moves
         Span<Move> moves = stackalloc Move[256];
-        board.GetLegalMovesNonAlloc(ref moves, depth <= 0);
+        board.GetLegalMovesNonAlloc(ref moves, quiescence);
 
-        // Early exit if we're in checkmate
-        if (moves.Length == 0 && board.IsInCheckmate())
-            return -32000 + ply;
+        // Early exit if we're in checkmate or draw
+        if (moves.Length == 0)
+            if (board.IsInCheckmate())
+                return bestScore + ply;
+            else if (!quiescence)
+                return 0;
+
+        // Quiet search
+        if (quiescence && (bestScore = alpha = Math.Max(alpha, Evaluate())) >= beta)
+            return alpha;
 
         var DoSearch = (int delta) => -Search(-beta, -alpha, depth + delta, ply + 1);
+
         // Null move pruning
-        if (depth > 2 && ply > 0 && board.TrySkipTurn())
+        if (depth > 2 && !root && board.TrySkipTurn())
         {
-            double score = DoSearch(-3);
+            score = DoSearch(-3);
             board.UndoSkipTurn();
             if (score >= beta)
                 return score; // or return score if you are using fail-soft
@@ -117,45 +134,28 @@ public class MyBot : IChessBot
         }
         scores.Sort(moves);
 
-        // Quiescence search (negative depth)
-        if (depth <= 0)
-        {
-            alpha = Math.Max(alpha, Evaluate());
-            if (alpha >= beta)
-                return alpha;
-            foreach (Move move in moves)
-            {
-                board.MakeMove(move);
-                alpha = Math.Max(alpha, -Search(-beta, -alpha, depth - 1, ply + 1));
-                board.UndoMove(move);
-                if (alpha >= beta)
-                    return beta;
-            }
-            return alpha;
-        }
-
-        // Early exit if we're in stalemate
-        if (moves.Length == 0)
-            return 0;
-
-        double bestScore = -32002;
-
+        m = 0;
         foreach (Move move in moves)
         {
             board.MakeMove(move);
 
-            double score = -Search(
-                -beta,
-                -alpha,
-                // Check extension, but only if we're not in quiescence search
-                board.IsInCheck()
-                    ? depth
-                    : depth - 1,
-                ply + 1
-            );
+            score = -Search(-beta, -alpha, depth + (board.IsInCheck() ? 0 : -1), ply + 1);
+
+            /* // Calculate check extension and late move reduction */
+            /* int delta = board.IsInCheck() */
+            /*     ? 0 */
+            /*     : m >= 3 && depth >= 3 && !move.IsCapture */
+            /*         ? -2 */
+            /*         : -1; */
+            /* m++; */
+            /**/
+            /* score = DoSearch(delta); */
+            /* // do full depth search on fail high when doing LMR */
+            /* if (delta == -2 && score > alpha) */
+            /*     score = DoSearch(-1); */
 
             // Avoid 3-fold repetition
-            if (ply == 0 && board.IsRepeatedPosition())
+            if (root && board.IsRepeatedPosition())
                 score -= 50;
 
             board.UndoMove(move);
@@ -165,7 +165,7 @@ public class MyBot : IChessBot
                 bestScore = score;
                 bestMove = move;
 
-                if (ply == 0)
+                if (root)
                     thinkBestMove = move;
 
                 if (score >= beta)
@@ -181,11 +181,12 @@ public class MyBot : IChessBot
                         killerMoves[ply, 1] = killerMoves[ply, 0];
                         killerMoves[ply, 0] = move;
                     }
-                    historyTable[
-                        Convert.ToInt32(board.IsWhiteToMove),
-                        bestMove.StartSquare.Index,
-                        bestMove.TargetSquare.Index
-                    ] += 1 << depth;
+                    if (!quiescence)
+                        historyTable[
+                            Convert.ToInt32(board.IsWhiteToMove),
+                            bestMove.StartSquare.Index,
+                            bestMove.TargetSquare.Index
+                        ] += 1 << depth;
                     break;
                 }
                 alpha = Math.Max(alpha, score);
@@ -193,18 +194,19 @@ public class MyBot : IChessBot
         }
 
         // Update transposition table
-        tt[board.ZobristKey] = new Transposition
-        {
-            BestMove = bestMove,
-            Depth = depth,
-            Score = bestScore,
-            Flag =
-                bestScore <= alphaOrig
-                    ? 2
-                    : bestScore >= beta
-                        ? 1
-                        : 0
-        };
+        if (!quiescence)
+            tt[board.ZobristKey] = new Transposition
+            {
+                BestMove = bestMove,
+                Depth = depth,
+                Score = bestScore,
+                Flag =
+                    bestScore <= alphaOrig
+                        ? 2
+                        : bestScore >= beta
+                            ? 1
+                            : 0
+            };
         return bestScore;
     }
 
