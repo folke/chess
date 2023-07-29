@@ -6,7 +6,7 @@ using ChessChallenge.API;
 // TODO:
 // - [ ] experiment with maxDepth > 9
 // - [ ] determine correct 32000 values (and format them with _)
-// - [ ] get oproper game phase from evaluate for time management and skipping NMP
+// - [x] get oproper game phase from evaluate for time management and skipping NMP
 
 public class MyBot : IChessBot
 {
@@ -107,8 +107,15 @@ public class MyBot : IChessBot
                 return score; // or return score if you are using fail-soft
         }
 
+        var HistEntry = (Move move) =>
+            ref historyTable[
+                Convert.ToInt32(board.IsWhiteToMove),
+                move.StartSquare.Index,
+                move.TargetSquare.Index
+            ];
+
         // Move ordering
-        Span<int> scores = stackalloc int[moves.Length];
+        Span<double> scores = stackalloc double[moves.Length];
         foreach (Move move in moves)
         {
             scores[m++] =
@@ -120,11 +127,7 @@ public class MyBot : IChessBot
                             + pieceValues[(int)move.MovePieceType - 1]
                         : killerMoves[ply, 0] == move || killerMoves[ply, 1] == move
                             ? -60000
-                            : -historyTable[
-                                Convert.ToInt32(board.IsWhiteToMove),
-                                move.StartSquare.Index,
-                                move.TargetSquare.Index
-                            ];
+                            : 1.0 / HistEntry(move);
         }
         scores.Sort(moves);
 
@@ -173,12 +176,10 @@ public class MyBot : IChessBot
                         killerMoves[ply, 1] = killerMoves[ply, 0];
                         killerMoves[ply, 0] = move;
                     }
+
                     if (!quiescence)
-                        historyTable[
-                            Convert.ToInt32(board.IsWhiteToMove),
-                            bestMove.StartSquare.Index,
-                            bestMove.TargetSquare.Index
-                        ] += 1 << depth;
+                        HistEntry(bestMove) += 1 << depth;
+                    /* he += (1 << depth) * (32 - he / 512); */
                     break;
                 }
                 alpha = Math.Max(alpha, score);
