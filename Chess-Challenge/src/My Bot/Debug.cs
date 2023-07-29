@@ -6,7 +6,7 @@ using ChessChallenge.API;
 
 public class DebugBot : MyBot, IChessBot
 {
-    public const bool Enabled = false;
+    public const bool Enabled = true;
     bool didInit = false;
 
     int statsNodes = 0;
@@ -170,7 +170,7 @@ public class DebugBot : MyBot, IChessBot
             double branchingFactor = (statsNodes + statsQNodes) / (double)nodesBefore;
 
             WriteLine(
-                $"{searchDepth}: {PrettyMove(thinkBestMove), -5} {Num(statsNodes + statsQNodes), -10} $ {Num(ret / 100.0, 2), -6} {Num(branchingFactor, 2)}"
+                $"{searchDepth}: {PrettyMove(thinkBestMove), -5} {Num(statsNodes + statsQNodes - nodesBefore), -10} $ {Num(ret / 100.0, 2), -6} {Num(branchingFactor, 2)}"
             );
         }
         return ret;
