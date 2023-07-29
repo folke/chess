@@ -43,8 +43,8 @@ public class MyBot : IChessBot
         timeLimit = DebugBot.TimeLimit(timeLimit); // #DEBUG
 
         // e2e4 for first move for white
-        if (board.ZobristKey == 13227872743731781434)
-            return new Move("e2e4", board);
+        /* if (board.ZobristKey == 13227872743731781434) */
+        /*     return new Move("e2e4", board); */
 
         try
         {
