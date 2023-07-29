@@ -106,7 +106,7 @@ public class MyBot : IChessBot
         // Null move pruning
         if (depth > 2 && !root && board.TrySkipTurn())
         {
-            score = DoSearch(-3);
+            score = -Search(-beta, -beta + 1, depth -3, ply + 1);
             board.UndoSkipTurn();
             if (score >= beta)
                 return score; // or return score if you are using fail-soft
