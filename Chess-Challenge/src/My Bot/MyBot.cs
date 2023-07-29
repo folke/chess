@@ -99,7 +99,7 @@ public class MyBot : IChessBot
             return alpha;
 
         // Null move pruning
-        if (depth > 2 && !root && board.TrySkipTurn())
+        if (depth > 2 && !root && gamePhase >= 12 && board.TrySkipTurn())
         {
             score = -Search(-beta, -beta + 1, depth - 3, nextPly);
             board.UndoSkipTurn();
