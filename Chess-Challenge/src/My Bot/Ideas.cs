@@ -29,3 +29,33 @@
 /*     if (alpha < score && score < beta) // if it failed high */
 /*         score = -Search(-beta, -score, ply - 1); // do a full re-search */
 /* } */
+
+
+// Aspiration windows
+
+/* double alpha = -32001; */
+/* double beta = 32001; */
+/* double aspirationWindow = 50; */
+/* try */
+/* { */
+/*     for (searchDepth = 1; searchDepth <= maxDepth; searchDepth++) */
+/*     { */
+/*         double bestScore = Search(alpha, beta, searchDepth, 0); */
+/*         if (bestScore <= alpha || bestScore >= beta) */
+/*         { */
+/*             Console.WriteLine("Aspiration window fail"); */
+/**/
+/*             // If score is out of bounds, re-search with a full window */
+/*             alpha = -32001; */
+/*             beta = 32001; */
+/*             bestScore = Search(alpha, beta, searchDepth, 0); */
+/*         } */
+/*         if (bestScore > 9000) */
+/*             break; */
+/**/
+/*         // Narrow the window for the next iteration */
+/*         alpha = bestScore - aspirationWindow; */
+/*         beta = bestScore + aspirationWindow; */
+/*     } */
+/* } */
+/* catch (TimeoutException) { } */
