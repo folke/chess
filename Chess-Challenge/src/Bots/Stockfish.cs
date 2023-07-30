@@ -1,6 +1,7 @@
 using System;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using ChessChallenge.API;
 
 public class StockfishBot : IChessBot
@@ -45,14 +46,23 @@ public class StockfishBot : IChessBot
         }
 
         Ins().WriteLine($"setoption name Skill Level value {SKILL_LEVEL}");
+        Ins().WriteLine("ucinewgame");
     }
 
     public Move Think(Board board, Timer timer)
     {
-        Ins().WriteLine("ucinewgame");
         Ins().WriteLine($"position fen {board.GetFenString()}");
-        var timeString = board.IsWhiteToMove ? "wtime" : "btime";
-        Ins().WriteLine($"go {timeString} {timer.MillisecondsRemaining}");
+
+        string me = "w",
+            other = "b";
+        if (!board.IsWhiteToMove)
+        {
+            (me, other) = (other, me);
+        }
+        Ins()
+            .WriteLine(
+                $"go {me}time {timer.MillisecondsRemaining} {other}time {timer.OpponentMillisecondsRemaining}"
+            );
         /* Ins().WriteLine($"go movetime 100"); */
 
         string? line;
