@@ -6,7 +6,7 @@ using ChessChallenge.API;
 
 public class DebugBot : MyBot, IChessBot
 {
-    public const bool Enabled = false;
+    public const bool Enabled = true;
     bool didInit = false;
 
     int statsNodes = 0;
@@ -25,7 +25,7 @@ public class DebugBot : MyBot, IChessBot
     public static double TimeLimit(double timeLimit)
     {
         /* return timeLimit; */
-        /* return 100; */
+        /* return 500; */
         return Enabled ? 10000 : 100;
     }
 
@@ -90,8 +90,13 @@ public class DebugBot : MyBot, IChessBot
         line ??= new List<(Move, string)>();
         line.Add((move, PrettyMove(move)));
         board.MakeMove(move);
-        Transposition trans = tt.GetValueOrDefault(board.ZobristKey);
-        if (trans.Depth != 0 && !trans.BestMove.IsNull && line.Count <= 16)
+        Transposition trans = tt[board.ZobristKey & 0x7FFFFF];
+        if (
+            trans.ZobristKey == board.ZobristKey
+            && trans.Depth != 0
+            && !trans.BestMove.IsNull
+            && line.Count <= 16
+        )
         {
             BestLine(trans.BestMove, line);
         }

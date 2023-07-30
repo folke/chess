@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Linq;
-using System.Collections.Generic;
 using ChessChallenge.API;
 
 // TODO:
@@ -14,6 +13,7 @@ public class MyBot : IChessBot
     {
         public Move BestMove;
         public double Score;
+        public ulong ZobristKey;
         public int Depth,
             Flag; // 0 = exact, 1 = lower bound, 2 = upper bound
     }
@@ -26,7 +26,7 @@ public class MyBot : IChessBot
         gamephaseInc =  { 0, 1, 1, 2, 4, 0 };
     public Timer timer;
     public Board board;
-    public readonly Dictionary<ulong, Transposition> tt = new();
+    public readonly Transposition[] tt = new Transposition[8388608]; // mask + 1
     public Move[,] killerMoves = new Move[500, 2];
     public Move thinkBestMove;
     public double timeLimit;
@@ -71,9 +71,9 @@ public class MyBot : IChessBot
             nextPly = ply + 1;
 
         // Check transposition table
-        Transposition trans = tt.GetValueOrDefault(board.ZobristKey);
+        ref Transposition trans = ref tt[board.ZobristKey & 0x7FFFFF];
         Move bestMove = trans.BestMove;
-        if (!root && trans.Depth >= depth && trans.Depth > 0)
+        if (!root && trans.ZobristKey == board.ZobristKey && trans.Depth >= depth)
         {
             if (trans.Flag == 1) // lower bound
                 alpha = Math.Max(alpha, trans.Score);
@@ -188,11 +188,12 @@ public class MyBot : IChessBot
 
         // Update transposition table
         if (!quiescence)
-            tt[board.ZobristKey] = new Transposition
+            trans = new Transposition
             {
                 BestMove = bestMove,
                 Depth = depth,
                 Score = bestScore,
+                ZobristKey = board.ZobristKey,
                 Flag =
                     bestScore <= alphaOrig
                         ? 2
