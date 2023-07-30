@@ -27,10 +27,21 @@ namespace ChessChallenge.Application
 
                 void DrawStats(ChallengeController.BotMatchStats stats)
                 {
+                    MyBotStats myStats = new MyBotStats(stats.NumWins, stats.NumLosses, stats.NumDraws);
                     DrawNextText(stats.BotName + ":", nameFontSize, Color.WHITE);
+
+                    double winning = myStats.WinningFraction() * 100;
+                    DrawNextText($"Winning: {winning:F0}%", regularFontSize, winning > 50 ? Color.GREEN : Color.RED);
                     DrawNextText($"Score: +{stats.NumWins} ={stats.NumDraws} -{stats.NumLosses}", regularFontSize, col);
-                    DrawNextText($"Num Timeouts: {stats.NumTimeouts}", regularFontSize, col);
-                    DrawNextText($"Num Illegal Moves: {stats.NumIllegalMoves}", regularFontSize, col);
+                    DrawNextText($"Elo: {myStats.EloDifference():+0;-0;0}", regularFontSize, col);
+                    DrawNextText($"LOS: {myStats.LOS() * 100:0}%", regularFontSize, col);
+                    MyBotStats.SprtTest sprt = myStats.Sprt();
+                    DrawNextText($"SPRT: {sprt}", UIHelper.ScaleInt(25), sprt.hypothesis == MyBotStats.Hypothesis.H0 ? Color.RED : sprt.hypothesis == MyBotStats.Hypothesis.H1 ? Color.GREEN : col);
+
+                    if (stats.NumTimeouts > 0)
+                        DrawNextText($"Timeouts: {stats.NumTimeouts}", regularFontSize, Color.RED);
+                    if (stats.NumIllegalMoves > 0)
+                        DrawNextText($"Illegal Moves: {stats.NumIllegalMoves}", regularFontSize, Color.RED);
                 }
            
                 void DrawNextText(string text, int fontSize, Color col)
