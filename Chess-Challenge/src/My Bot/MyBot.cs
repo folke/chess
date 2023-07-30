@@ -6,6 +6,7 @@ using ChessChallenge.API;
 // - [ ] experiment with maxDepth > 9
 // - [ ] determine correct 32000 values (and format them with _)
 // - [x] get oproper game phase from evaluate for time management and skipping NMP
+// - [ ] MPV at phase 8?
 
 public class MyBot : IChessBot
 {
@@ -49,6 +50,7 @@ public class MyBot : IChessBot
         try
         {
             for (searchDepth = 1; searchDepth <= 50; searchDepth++)
+                /* if (Math.Abs(Search(-32001, 32001, searchDepth, 0)) > 9000) */
                 if (Search(-32001, 32001, searchDepth, 0) > 9000)
                     break;
         }
@@ -72,8 +74,8 @@ public class MyBot : IChessBot
 
         // Check transposition table
         ref Transposition trans = ref tt[board.ZobristKey & 0x7FFFFF];
-        Move bestMove = trans.BestMove;
-        if (!root && trans.ZobristKey == board.ZobristKey && trans.Depth >= depth)
+        Move bestMove = trans.BestMove; // Always use the tt move, even if its value won't be used
+        if (!root && trans.ZobristKey == board.ZobristKey && (trans.Depth >= depth || quiescence))
         {
             if (trans.Flag == 1) // lower bound
                 alpha = Math.Max(alpha, trans.Score);
@@ -187,7 +189,10 @@ public class MyBot : IChessBot
         }
 
         // Update transposition table
-        if (!quiescence)
+        /* if (!quiescence) // dont update TT for quiescence search */
+        /* if (!quiescence || trans.Depth <= 0) // always update for regular search and for qsearch if q entry */
+        /* if (trans.Depth <= (quiescence ? 0 : depth)) // always update if qsearch or if depth is greater */
+        if (trans.Depth <= depth || quiescence) // always update if depth is greater or if qsearch
             trans = new Transposition
             {
                 BestMove = bestMove,

@@ -91,12 +91,7 @@ public class DebugBot : MyBot, IChessBot
         line.Add((move, PrettyMove(move)));
         board.MakeMove(move);
         Transposition trans = tt[board.ZobristKey & 0x7FFFFF];
-        if (
-            trans.ZobristKey == board.ZobristKey
-            && trans.Depth != 0
-            && !trans.BestMove.IsNull
-            && line.Count <= 16
-        )
+        if (trans.ZobristKey == board.ZobristKey && !trans.BestMove.IsNull && line.Count <= 32)
         {
             BestLine(trans.BestMove, line);
         }
@@ -132,7 +127,7 @@ public class DebugBot : MyBot, IChessBot
         if (move.IsPromotion)
         {
             ret += "=";
-            ret += icons[idx];
+            ret += icons[(int)move.PromotionPieceType - 1];
         }
         if (move.IsCastles)
         {
