@@ -6,14 +6,15 @@ using ChessChallenge.API;
 
 public class DebugBot : MyBot, IChessBot
 {
-    public const bool Enabled = true;
-    bool didInit = false;
+    public const int GameDuration = 10 * 1000;
+    public const bool Enabled = false;
 
+    bool didInit = false;
     int statsNodes = 0;
     int statsQNodes = 0;
-    int statsEvals = 0;
     double bestScore = 0;
     int[] statsSearch;
+    Board rootBoard;
 
     public void Init()
     {
@@ -26,7 +27,7 @@ public class DebugBot : MyBot, IChessBot
     {
         /* return timeLimit; */
         /* return 500; */
-        return Enabled ? 10000 : 100;
+        return Enabled ? 10000 : timeLimit;
     }
 
     public new Move Think(Board board, Timer timer)
@@ -34,20 +35,18 @@ public class DebugBot : MyBot, IChessBot
         if (!didInit)
             Init();
 
+        string fen = board.GetFenString();
+        WriteLine("fen: " + fen);
+        rootBoard = Board.CreateBoardFromFEN(fen);
         statsSearch = new int[50 * 2 + 16];
         bestScore = 0;
         statsNodes = 0;
         statsQNodes = 0;
-        statsEvals = 0;
-
-        string fen = board.GetFenString();
-        WriteLine("fen: " + fen);
 
         Move move = base.Think(board, timer);
-        this.board = Board.CreateBoardFromFEN(fen);
         List<(Move, string)> list = BestLine(move);
 
-        int mateIn = list.Last().Item2.Contains('#') ? (list.Count + 1) / 2 : -1;
+        int mateIn = list.Count > 0 && list.Last().Item2.Contains('#') ? (list.Count + 1) / 2 : -1;
         string score = mateIn == -1 ? Num(bestScore / 100.0, 2) : "#" + mateIn;
 
         WriteLine(
@@ -88,14 +87,16 @@ public class DebugBot : MyBot, IChessBot
     public List<(Move, string)> BestLine(Move move, List<(Move, string)>? line = null)
     {
         line ??= new List<(Move, string)>();
+        if (move.IsNull || !rootBoard.GetLegalMoves().Contains(move))
+            return line;
         line.Add((move, PrettyMove(move)));
-        board.MakeMove(move);
-        Transposition trans = tt[board.ZobristKey & 0x7FFFFF];
-        if (trans.ZobristKey == board.ZobristKey && !trans.BestMove.IsNull && line.Count <= 32)
+        rootBoard.MakeMove(move);
+        Transposition trans = tt[rootBoard.ZobristKey & 0x7FFFFF];
+        if (trans.ZobristKey == rootBoard.ZobristKey && !trans.BestMove.IsNull && line.Count <= 32)
         {
             BestLine(trans.BestMove, line);
         }
-        board.UndoMove(move);
+        rootBoard.UndoMove(move);
 
         return line;
     }
@@ -117,6 +118,9 @@ public class DebugBot : MyBot, IChessBot
 
     public string PrettyMove(Move move)
     {
+        if (move.IsNull)
+            return "NullMove ???";
+
         string[] icons = new string[] { "󰡙", "󰡘", "󰡜", "󰡛", "󰡚", "󰡗 " };
         string[] files = new string[] { "a", "b", "c", "d", "e", "f", "g", "h" };
         int idx = (int)move.MovePieceType - 1;
@@ -133,12 +137,14 @@ public class DebugBot : MyBot, IChessBot
         {
             ret = move.TargetSquare.File == 6 ? "O-O" : "O-O-O";
         }
-        board.MakeMove(move);
-        if (board.IsInCheckmate())
+        if (!rootBoard.GetLegalMoves().Contains(move))
+            return ret + " ???";
+        rootBoard.MakeMove(move);
+        if (rootBoard.IsInCheckmate())
             ret += "#";
-        else if (board.IsInCheck())
+        else if (rootBoard.IsInCheck())
             ret += "+";
-        board.UndoMove(move);
+        rootBoard.UndoMove(move);
         return ret;
     }
 

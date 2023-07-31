@@ -33,7 +33,8 @@ namespace ChessChallenge.Application
                     double winning = myStats.WinningFraction() * 100;
                     DrawNextText($"Winning: {winning:F0}%", regularFontSize, winning > 50 ? Color.GREEN : Color.RED);
                     DrawNextText($"Score: +{stats.NumWins} ={stats.NumDraws} -{stats.NumLosses}", regularFontSize, col);
-                    DrawNextText($"Elo: {myStats.EloDifference():+0;-0;0}", regularFontSize, col);
+                    double elo = myStats.EloDifference();
+                    DrawNextText($"Elo: {elo:+0;-0;0} +/-{myStats.EloErrorMargin():F0}", regularFontSize, col);
                     DrawNextText($"LOS: {myStats.LOS() * 100:0}%", regularFontSize, col);
                     MyBotStats.SprtTest sprt = myStats.Sprt();
                     DrawNextText($"SPRT: {sprt}", UIHelper.ScaleInt(25), sprt.hypothesis == MyBotStats.Hypothesis.H0 ? Color.RED : sprt.hypothesis == MyBotStats.Hypothesis.H1 ? Color.GREEN : col);

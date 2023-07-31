@@ -47,9 +47,50 @@ public class MyBotStats
         return (Wins + 0.5 * Draws) / Games();
     }
 
-    public double EloDifference()
+    public double EloDifference(double? winningFraction = null)
     {
-        return -Math.Log(1.0 / WinningFraction() - 1.0) * 400.0 / Math.Log(10.0);
+        winningFraction ??= WinningFraction();
+        return -Math.Log(1.0 / (double)winningFraction - 1.0) * 400.0 / Math.Log(10.0);
+    }
+
+    public double EloErrorMargin()
+    {
+        double total = Wins + Draws + Losses;
+        double winP = Wins / total;
+        double drawP = Draws / total;
+        double lossP = Losses / total;
+
+        double percentage = (Wins + Draws / 2.0) / total;
+        double winDev = winP * Math.Pow(1 - percentage, 2);
+        double drawsDev = drawP * Math.Pow(0.5 - percentage, 2);
+        double lossesDev = lossP * Math.Pow(0 - percentage, 2);
+
+        double stdDeviation = Math.Sqrt(winDev + drawsDev + lossesDev) / Math.Sqrt(total);
+
+        double confidenceP = 0.95;
+        double minConfidenceP = (1 - confidenceP) / 2;
+        double maxConfidenceP = 1 - minConfidenceP;
+        double devMin = percentage + PhiInv(minConfidenceP) * stdDeviation;
+        double devMax = percentage + PhiInv(maxConfidenceP) * stdDeviation;
+
+        double difference = EloDifference(devMax) - EloDifference(devMin);
+        double margin = Math.Round(difference / 2);
+        return double.IsNaN(margin) ? 0 : margin;
+    }
+
+    private static double PhiInv(double p)
+    {
+        return Math.Sqrt(2) * ErfInv(2 * p - 1);
+    }
+
+    private static double ErfInv(double x)
+    {
+        double a = 8 * (Math.PI - 3) / (3 * Math.PI * (4 - Math.PI));
+        double y = Math.Log(1 - x * x);
+        double z = 2 / (Math.PI * a) + y / 2;
+
+        double ret = Math.Sqrt(Math.Sqrt(z * z - y / a) - z);
+        return x < 0 ? -ret : ret;
     }
 
     public double LOS()
