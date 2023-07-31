@@ -88,6 +88,10 @@ public class MyBot : IChessBot
                 if (trans.Flag == 0 || alpha >= beta) // exact
                     return trans.Score;
             }
+
+            // Mate distance pruning
+            if ((alpha = Math.Max(mateScore, alpha)) >= (beta = Math.Min(-mateScore - 1, beta)))
+                return alpha;
         }
 
         // Get legal moves
