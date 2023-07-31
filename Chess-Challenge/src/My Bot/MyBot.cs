@@ -7,6 +7,7 @@ using ChessChallenge.API;
 // - [ ] determine correct 32000 values (and format them with _)
 // - [x] get oproper game phase from evaluate for time management and skipping NMP
 // - [ ] MPV at phase 8?
+// - [ ] Debug: show mate in X based on mate score and ply
 
 public class MyBot : IChessBot
 {
@@ -43,16 +44,11 @@ public class MyBot : IChessBot
         timeLimit = timer.MillisecondsRemaining / (gamePhase == 24 ? 60.0 : 30.0);
         timeLimit = DebugBot.TimeLimit(timeLimit); // #DEBUG
 
-        // e2e4 for first move for white
-        /* if (board.ZobristKey == 13227872743731781434) */
-        /*     return new Move("e2e4", board); */
+        searchDepth = 0;
 
         try
         {
-            for (searchDepth = 1; searchDepth <= 50; searchDepth++)
-                /* if (Math.Abs(Search(-32001, 32001, searchDepth, 0)) > 9000) */
-                if (Search(-32001, 32001, searchDepth, 0) > 9000)
-                    break;
+            while (Math.Abs(Search(-32001, 32001, ++searchDepth, 0)) < 16000) { }
         }
         catch (TimeoutException) { }
         return thinkBestMove;
@@ -64,13 +60,16 @@ public class MyBot : IChessBot
             throw new TimeoutException();
 
         double alphaOrig = alpha,
-            bestScore = -32000,
+            bestScore = -32001,
             score;
         // Quiescence search (negative depth)
         bool quiescence = depth <= 0,
             root = ply == 0;
         int m = 0,
             nextPly = ply + 1;
+
+        if (!root && board.GameRepetitionHistory.Contains(board.ZobristKey))
+            return 0;
 
         // Check transposition table
         ref Transposition trans = ref tt[board.ZobristKey & 0x7FFFFF];
@@ -92,7 +91,7 @@ public class MyBot : IChessBot
         // Early exit if we're in checkmate or draw
         if (moves.Length == 0)
             if (board.IsInCheckmate())
-                return bestScore + ply;
+                return -32000 + ply;
             else if (!quiescence)
                 return 0;
 
@@ -152,8 +151,8 @@ public class MyBot : IChessBot
                 score = -Search(-beta, -alpha, depth - 1, nextPly);
 
             // Avoid 3-fold repetition
-            if (root && board.IsRepeatedPosition())
-                score -= 50;
+            /* if (root && board.IsRepeatedPosition()) */
+            /*     score -= 50; */
 
             board.UndoMove(move);
 
