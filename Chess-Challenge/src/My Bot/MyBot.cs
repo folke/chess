@@ -61,37 +61,42 @@ public class MyBot : IChessBot
 
         double alphaOrig = alpha,
             bestScore = -32001,
+            mateScore = -32000 + ply,
             score;
-        // Quiescence search (negative depth)
+        ulong zobristKey = board.ZobristKey;
         bool quiescence = depth <= 0,
             root = ply == 0;
         int m = 0,
             nextPly = ply + 1;
 
-        if (!root && board.GameRepetitionHistory.Contains(board.ZobristKey))
-            return 0;
-
-        // Check transposition table
-        ref Transposition trans = ref tt[board.ZobristKey & 0x7FFFFF];
+        ref Transposition trans = ref tt[zobristKey & 0x7FFFFF];
         Move bestMove = trans.BestMove; // Always use the tt move, even if its value won't be used
-        if (!root && trans.ZobristKey == board.ZobristKey && (trans.Depth >= depth || quiescence))
+
+        if (!root)
         {
-            if (trans.Flag == 1) // lower bound
-                alpha = Math.Max(alpha, trans.Score);
-            else if (trans.Flag == 2) // upper bound
-                beta = Math.Min(beta, trans.Score);
-            if (trans.Flag == 0 || alpha >= beta) // exact
-                return trans.Score;
+            // Prevent 3-fold repetition
+            if (board.GameRepetitionHistory.Contains(zobristKey))
+                return 0;
+
+            // Check transposition table
+            if (trans.ZobristKey == zobristKey && (trans.Depth >= depth || quiescence))
+            {
+                if (trans.Flag == 1) // lower bound
+                    alpha = Math.Max(alpha, trans.Score);
+                else if (trans.Flag == 2) // upper bound
+                    beta = Math.Min(beta, trans.Score);
+                if (trans.Flag == 0 || alpha >= beta) // exact
+                    return trans.Score;
+            }
         }
 
         // Get legal moves
-        Span<Move> moves = stackalloc Move[256];
-        board.GetLegalMovesNonAlloc(ref moves, quiescence);
+        var moves = board.GetLegalMoves(quiescence);
 
         // Early exit if we're in checkmate or draw
         if (moves.Length == 0)
             if (board.IsInCheckmate())
-                return -32000 + ply;
+                return mateScore;
             else if (!quiescence)
                 return 0;
 
@@ -151,10 +156,6 @@ public class MyBot : IChessBot
             if (delta == -2 && score > alpha)
                 score = -Search(-beta, -alpha, depth - 1, nextPly);
 
-            // Avoid 3-fold repetition
-            /* if (root && board.IsRepeatedPosition()) */
-            /*     score -= 50; */
-
             board.UndoMove(move);
 
             if (score > bestScore)
@@ -198,7 +199,7 @@ public class MyBot : IChessBot
                 BestMove = bestMove,
                 Depth = depth,
                 Score = bestScore,
-                ZobristKey = board.ZobristKey,
+                ZobristKey = zobristKey,
                 Flag =
                     bestScore <= alphaOrig
                         ? 2
