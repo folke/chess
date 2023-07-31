@@ -116,23 +116,24 @@ public class MyBot : IChessBot
             ];
 
         // Move ordering
-        Span<double> scores = stackalloc double[moves.Length];
-        foreach (Move move in moves)
-        {
-            scores[m++] =
-                move == bestMove
-                    ? -80000
-                    : move.IsCapture
-                        ? -70000
-                            - pieceValues[(int)move.CapturePieceType - 1]
-                            + pieceValues[(int)move.MovePieceType - 1]
-                        : killerMoves[ply, 0] == move || killerMoves[ply, 1] == move
-                            ? -60000
-                            : 1.0 / HistEntry(move);
-        }
-        scores.Sort(moves);
+        Array.Sort(
+            moves
+                .Select(
+                    move =>
+                        move == bestMove
+                            ? -80000
+                            : move.IsCapture
+                                ? -70000
+                                    - pieceValues[(int)move.CapturePieceType - 1]
+                                    + pieceValues[(int)move.MovePieceType - 1]
+                                : killerMoves[ply, 0] == move || killerMoves[ply, 1] == move
+                                    ? -60000
+                                    : 1.0 / HistEntry(move)
+                )
+                .ToArray(),
+            moves
+        );
 
-        m = 0;
         foreach (Move move in moves)
         {
             board.MakeMove(move);
