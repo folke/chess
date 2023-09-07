@@ -24,6 +24,7 @@ namespace ChessChallenge.Application
             EvilBot,
             LithiumBot,
             NegamaxBot,
+            TyrantBot,
             Stockfish,
         }
 
@@ -217,6 +218,7 @@ namespace ChessChallenge.Application
                 PlayerType.MyBot1 => new ChessPlayer(new MyBot1(), type, GameDurationMilliseconds),
                 PlayerType.BestBot => new ChessPlayer(new MyBot16(), type, GameDurationMilliseconds),
                 PlayerType.EvilBot => new ChessPlayer(new EvilBot(), type, GameDurationMilliseconds),
+                PlayerType.TyrantBot => new ChessPlayer(new TyrantBot(), type, GameDurationMilliseconds),
                 PlayerType.LithiumBot => new ChessPlayer(new LithiumBot(), type, GameDurationMilliseconds),
                 PlayerType.NegamaxBot => new ChessPlayer(new NegamaxBot(), type, GameDurationMilliseconds),
                 PlayerType.Stockfish => new ChessPlayer(new StockfishBot(), type, GameDurationMilliseconds),
