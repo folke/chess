@@ -17,11 +17,11 @@ public class MyBot : IChessBot
         phase,
         gamePhase;
     public readonly int[] pesto,
-        pieceValues =  { 82, 337, 365, 477, 1025, 0, 94, 281, 297, 512, 936, 0 },
+        pieceValues =  { 82, 337, 365, 477, 1_025, 0, 94, 281, 297, 512, 936, 0 },
         gamephaseInc =  { 0, 1, 1, 2, 4, 0 };
     public Timer timer;
     public Board board;
-    public readonly Transposition[] tt = new Transposition[8388608]; // mask + 1
+    public readonly Transposition[] tt = new Transposition[8_388_608]; // mask + 1
     public Move[,] killerMoves = new Move[500, 2];
     public Move thinkBestMove;
     public double timeLimit;
@@ -40,7 +40,7 @@ public class MyBot : IChessBot
 
         try
         {
-            while (Math.Abs(Search(-32001, 32001, ++searchDepth, 0)) < 16000) { }
+            while (Math.Abs(Search(-32_001, 32_001, ++searchDepth, 0)) < 16_000) { }
         }
         catch (TimeoutException) { }
         return thinkBestMove;
@@ -52,8 +52,8 @@ public class MyBot : IChessBot
             throw new TimeoutException();
 
         double alphaOrig = alpha,
-            bestScore = -32001,
-            mateScore = -32000 + ply,
+            bestScore = -32_001,
+            mateScore = -32_000 + ply,
             score;
         ulong zobristKey = board.ZobristKey;
         bool quiescence = depth <= 0,
@@ -122,13 +122,13 @@ public class MyBot : IChessBot
                 .Select(
                     move =>
                         move == bestMove
-                            ? -80000
+                            ? -80_000
                             : move.IsCapture
-                                ? -70000
+                                ? -70_000
                                     - pieceValues[(int)move.CapturePieceType - 1]
                                     + pieceValues[(int)move.MovePieceType - 1]
                                 : killerMoves[ply, 0] == move || killerMoves[ply, 1] == move
-                                    ? -60000
+                                    ? -60_000
                                     : 1.0 / HistEntry(move)
                 )
                 .ToArray(),
