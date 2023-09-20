@@ -2,13 +2,6 @@
 using System.Linq;
 using ChessChallenge.API;
 
-// TODO:
-// - [ ] experiment with maxDepth > 9
-// - [ ] determine correct 32000 values (and format them with _)
-// - [x] get oproper game phase from evaluate for time management and skipping NMP
-// - [ ] MPV at phase 8?
-// - [ ] Debug: show mate in X based on mate score and ply
-
 public class MyBot : IChessBot
 {
     public struct Transposition
@@ -42,7 +35,6 @@ public class MyBot : IChessBot
         gamePhase = phase;
 
         timeLimit = timer.MillisecondsRemaining / (gamePhase == 24 ? 60.0 : 30.0);
-        timeLimit = DebugBot.TimeLimit(timeLimit); // #DEBUG
 
         searchDepth = 0;
 
