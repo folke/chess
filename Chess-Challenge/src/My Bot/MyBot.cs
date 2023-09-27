@@ -229,7 +229,10 @@ public class MyBot : IChessBot
                 eg = -eg;
             }
         }
-        return (mg * phase + eg * (24 - phase)) / 24.0 * (board.IsWhiteToMove ? 1 : -1);
+        return (mg * phase + eg * (24 - phase)) / 24.0 * (board.IsWhiteToMove ? 1 : -1)
+            +
+            // Tempo bonus
+            +17;
     }
 
     public readonly int[] pieceValues =  { 82, 337, 365, 477, 1_025, 0, 94, 281, 297, 512, 936, 0 },
