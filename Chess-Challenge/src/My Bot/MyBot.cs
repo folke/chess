@@ -221,6 +221,7 @@ public class MyBot : IChessBot
                 int sq = BitboardHelper.ClearAndGetIndexOfLSB(ref bb) ^ (i / 6 * 56) + p * 128;
                 mg += pieceValues[p] + pesto[sq];
                 eg += pieceValues[p + 6] + pesto[sq + 64];
+
                 phase += gamephaseInc[p];
             }
             if (i == 5)
@@ -230,9 +231,8 @@ public class MyBot : IChessBot
             }
         }
         return (mg * phase + eg * (24 - phase)) / 24.0 * (board.IsWhiteToMove ? 1 : -1)
-            +
             // Tempo bonus
-            +17;
+            + 17;
     }
 
     public readonly int[] pieceValues =  { 82, 337, 365, 477, 1_025, 0, 94, 281, 297, 512, 936, 0 },
