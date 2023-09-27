@@ -33,7 +33,7 @@ public class MyBot : IChessBot
         Evaluate();
         gamePhase = phase;
 
-        timeLimit = timer.MillisecondsRemaining / (gamePhase == 24 ? 60.0 : 30.0);
+        timeLimit = timer.MillisecondsRemaining / (gamePhase == 24 ? 40.0 : 30.0);
 
         searchDepth = 0;
 
