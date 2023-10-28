@@ -6,28 +6,27 @@ using ChessChallenge.API;
 
 public class DebugBot : MyBot, IChessBot
 {
-    public const int GameDuration = 10 * 1000;
-    public const bool Enabled = false;
+    public const int GameDuration = 60 * 1000;
+    public const bool Enabled = true;
 
     bool didInit = false;
     int statsNodes = 0;
     int statsQNodes = 0;
     double bestScore = 0;
-    int[] statsSearch;
     Board rootBoard;
 
     public void Init()
     {
         didInit = true;
         Console.WriteLine("DebugBot");
-        new ChessTables().Generate();
+        /* new ChessTables().Generate(); */
     }
 
     public static double TimeLimit(double timeLimit)
     {
-        /* return timeLimit; */
+        return timeLimit;
         /* return 500; */
-        return Enabled ? 10000 : timeLimit;
+        /* return Enabled ? 10000 : 100; */
     }
 
     public new Move Think(Board board, Timer timer)
@@ -38,7 +37,6 @@ public class DebugBot : MyBot, IChessBot
         string fen = board.GetFenString();
         WriteLine("fen: " + fen);
         rootBoard = Board.CreateBoardFromFEN(fen);
-        statsSearch = new int[50 * 2 + 16];
         bestScore = 0;
         statsNodes = 0;
         statsQNodes = 0;
@@ -159,10 +157,6 @@ public class DebugBot : MyBot, IChessBot
 
     public override double Search(double alpha, double beta, int depth, int ply)
     {
-        int idx = searchDepth + 16;
-
-        statsSearch[idx]++;
-
         int nodesBefore = statsNodes + statsQNodes;
 
         if (depth <= 0)

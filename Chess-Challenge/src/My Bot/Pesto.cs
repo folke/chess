@@ -7,8 +7,8 @@ public class ChessTables
     public void Generate()
     {
         decimal[] mg = PackPesto();
-        if (!SameTable(mg, MyBot.pesto_packed))
-            throw new Exception("Packing failed");
+        /* if (!SameTable(mg, MyBot.pesto_packed)) */
+        /*     throw new Exception("Packing failed"); */
         /* decimal[] eg = PackTable(eg_pesto_table); */
         /* if (!SameTable(eg, MyBot.eg_pesto_packed)) */
         /*     throw new Exception("Packing failed"); */
