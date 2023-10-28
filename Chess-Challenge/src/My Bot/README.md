@@ -1,15 +1,19 @@
 # Zypher
 
-- [Iterative Deepening](https://www.chessprogramming.org/Iterative_Deepening): The bot searches the game tree to increasing depths until it runs out of time. This helps it to make the best decision within the given time frame.
 - [Alpha-beta Pruning](https://www.chessprogramming.org/Alpha-Beta): A search algorithm that reduces the number of nodes that need to be evaluated in the game tree. It dismisses branches that do not need to be searched because there already exists a better move available.
+- [Check Extensions](https://www.chessprogramming.org/Check_Extensions): When the bot's king is in check, it extends the search depth to explore all possible responses to the check.
+- [Endgame](https://www.chessprogramming.org/Endgame): As the bot enters the endgame phase of the match, it switches to a different evaluation function that is better suited to this phase.
+- [Iterative Deepening](https://www.chessprogramming.org/Iterative_Deepening): The bot searches the game tree to increasing depths until it runs out of time. This helps it to make the best decision within the given time frame.
+- [Killer Move Heuristic](https://www.chessprogramming.org/Killer_Move): The bot stores and prioritizes moves that caused a cutoff in the alpha-beta search in previous nodes at the same depth.
+- [Late Move Reduction](https://www.chessprogramming.org/Late_Move_Reductions): This heuristic reduces the search depth for moves that are unlikely to be good, thereby speeding up the search process.
+- [Late Move Reduction](https://www.chessprogramming.org/Late_Move_Reductions): This heuristic reduces the search depth for moves that are unlikely to be good, thereby speeding up the search process.
+- [Mate Distance Pruning](https://www.chessprogramming.org/Mate_Distance_Pruning): This heuristic prunes branches that are too far from the current best move, thereby speeding up the search process.
+- [Material and Positional Evaluation](https://www.chessprogramming.org/Evaluation): The bot evaluates the material balance (the sum of piece values for each side) and positional factors to get a score for the current board state.
+- [Move Ordering](https://www.chessprogramming.org/Move_Ordering): Prioritizes certain moves over others in the search tree to increase the chance of cutoffs, thereby speeding up the search process.
+- [Null Move Pruning](https://www.chessprogramming.org/Null_Move_Pruning): This heuristic prunes branches that are unlikely to be good by making a null move, thereby speeding up the search process.
+- [PeSTO's Evaluation Function](https://www.chessprogramming.org/PeSTO%27s_Evaluation_Function): The bot uses this piece-square table based evaluation function, which helps it evaluate the game state based on the pieces on the board and their positions.
+- [Piece-Square Tables](https://www.chessprogramming.org/Piece-Square_Tables): These tables give scores to each piece depending on its position on the board. These scores are used during the evaluation of the board state.
 - [Quiescence Search](https://www.chessprogramming.org/Quiescence_Search): This is used to search only positions that are "quiet" or stable (i.e., not likely to change radically in the near future). This helps to avoid the "horizon effect" where the bot makes a seemingly good short-term decision, but it results in a big disadvantage in the long term.
+- [Time Management](https://www.chessprogramming.org/Time_Management): The bot adjusts the time it spends on a particular move based on the current game situation, including the number of pieces left on the board.
 - [Transposition Table](https://www.chessprogramming.org/Transposition_Table): A table that stores previously evaluated board positions to avoid redundant evaluations. This helps in both speeding up the search process and improving the quality of the search.
 - [Zobrist Hashing](https://www.chessprogramming.org/Zobrist_Hashing): A method to represent each unique board state with a unique hash value, used to efficiently store and retrieve board states in the transposition table.
-- [Check Extensions](https://www.chessprogramming.org/Check_Extensions): When the bot's king is in check, it extends the search depth to explore all possible responses to the check.
-- [Killer Move Heuristic](https://www.chessprogramming.org/Killer_Move): The bot stores and prioritizes moves that caused a cutoff in the alpha-beta search in previous nodes at the same depth.
-- [Move Ordering](https://www.chessprogramming.org/Move_Ordering): Prioritizes certain moves over others in the search tree to increase the chance of cutoffs, thereby speeding up the search process.
-- [Time Management](https://www.chessprogramming.org/Time_Management): The bot adjusts the time it spends on a particular move based on the current game situation, including the number of pieces left on the board.
-- [Piece-Square Tables](https://www.chessprogramming.org/Piece-Square_Tables): These tables give scores to each piece depending on its position on the board. These scores are used during the evaluation of the board state.
-- [Material and Positional Evaluation](https://www.chessprogramming.org/Evaluation): The bot evaluates the material balance (the sum of piece values for each side) and positional factors to get a score for the current board state.
-- [Endgame](https://www.chessprogramming.org/Endgame): As the bot enters the endgame phase of the match, it switches to a different evaluation function that is better suited to this phase.
-- [PeSTO's Evaluation Function](https://www.chessprogramming.org/PeSTO%27s_Evaluation_Function): The bot uses this piece-square table based evaluation function, which helps it evaluate the game state based on the pieces on the board and their positions.
