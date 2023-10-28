@@ -1,22 +1,132 @@
+// Tyrant's Engine
+// Version 8.6
+// Current token count: 1016
+// Created for Sebastian Lague's Tiny Chess Bots challenge and competition
+//
+// Special thanks to:
+// Cmndr, Tisajokt, Jw1912, Cj5716, Antares, Toanth, Ciekce, Gedas, Broxholme, A_randomnoob, Waterwall, Atad,
+// and many others who have helped me learn and grow during this challenge
+//
+//
+
+
 //#define DEBUG
 
 using ChessChallenge.API;
 using System;
 using System.Linq;
 
-// TODO: Try tuning eval
+// TODO: IMPORTANT: Get a real opening book
+// TODO: Retune eval using Gedas' tuner now that it has stacked pawn evaluation
 // TODO: Play with values for dynamic NMP
-// TODO: LMP
-// TODO: Try to token optimize using multiple assignment
-// TODO: Move the assignment of unpacked pesto tables outside of constructor
-// TODO: Try history based LMR
 // TODO: SPRT the beta check for PVS before full search
 // TODO: Change around how unpacking PeSTO tables works
 //    -> bake differences between middlegame and endgame piece values into the squares themselves and just add a base piece value
+// TODO: Test for timeout above move loop
+// TODO: LMP (again lol, try using altair for reference)
+// TODO: Aspiration windows with increasing delta
+// TODO: Test promotion ordering again
 
 public class TyrantBot : IChessBot
 {
-    private readonly int[][] UnpackedPestoTables;
+    // Pawn, Knight, Bishop, Rook, Queen, King
+    private static readonly int[] PieceValues =
+        {
+            77,
+            302,
+            310,
+            434,
+            890,
+            0, // Middlegame
+            109,
+            331,
+            335,
+            594,
+            1116,
+            0,
+        }, // Endgame
+        MoveScores = new int[218],
+        // Big table packed with data from premade piece square tables
+        // Access using using PackedEvaluationTables[square * 16 + pieceType] = score
+        UnpackedPestoTables = new[]
+        {
+            59445390105436474986072674560m,
+            70290677894333901267150682880m,
+            71539517137735599738519086336m,
+            78957476706409475571971323392m,
+            76477941479143404670656189696m,
+            78020492916263816717520067072m,
+            77059410983631195892660944640m,
+            61307098105356489251813834752m,
+            77373759864583735626648317994m,
+            3437103645554060776222818613m,
+            5013542988189698109836108074m,
+            2865258213628105516468149820m,
+            5661498819074815745865228343m,
+            8414185094009835055136457260m,
+            7780689186187929908113377023m,
+            2486769613674807657298071274m,
+            934589548775805732457284597m,
+            4354645360213341838043912961m,
+            8408178448912173986754536726m,
+            9647317858599793704577609753m,
+            9972476475626052485400971547m,
+            9023455558428990305557695533m,
+            9302688995903440861301845277m,
+            4030554014361651745759368192m,
+            78006037809249804099646260205m,
+            5608292212701744542498884606m,
+            9021118043939758059554412800m,
+            11825811962956083217393723906m,
+            11837863313235587677091076880m,
+            11207998775238414808093699594m,
+            9337766883211775102593666830m,
+            4676129865778184699670239740m,
+            75532551896838498151443462373m,
+            3131203134016898079077499641m,
+            8090231125077317934436125943m,
+            11205623443703685966919568899m,
+            11509049675918088175762150403m,
+            9025911301112313205746176509m,
+            6534267870125294841726636036m,
+            3120251651824756925472439792m,
+            74280085839011331528989207781m,
+            324048954150360030097570806m,
+            4681017700776466875968718582m,
+            7150867317927305549636569078m,
+            7155688890998399537110584833m,
+            5600986637454890754120354040m,
+            1563108101768245091211217423m,
+            78303310575846526174794479097m,
+            70256775951642154667751105509m,
+            76139418398446961904222530552m,
+            78919952506429230065925355250m,
+            2485617727604605227028709358m,
+            3105768375617668305352130555m,
+            1225874429600076432248013062m,
+            76410151742261424234463229975m,
+            72367527118297610444645922550m,
+            64062225663112462441888793856m,
+            67159522168020586196575185664m,
+            71185268483909686702087266048m,
+            75814236297773358797609495296m,
+            69944882517184684696171572480m,
+            74895414840161820695659345152m,
+            69305332238573146615004392448m,
+            63422661310571918454614119936m,
+        }
+            .SelectMany(
+                packedTable =>
+                    decimal.GetBits(packedTable)
+                        .SelectMany(BitConverter.GetBytes)
+                        // No point in only taking 12 bytes. Since we never access the last 4 anyway, we can just leave them as garbage
+                        .Select(
+                            (square, index) =>
+                                (int)((sbyte)square * 1.461) + PieceValues[index % 12]
+                        )
+                        .ToArray()
+            )
+            .ToArray();
 
     // enum Flag
     // {
@@ -39,113 +149,7 @@ public class TyrantBot : IChessBot
 
     private readonly Move[] killers = new Move[2048];
 
-    // Pawn, Knight, Bishop, Rook, Queen, King
-    private readonly int[] PieceValues =
-        {
-            82,
-            337,
-            365,
-            477,
-            1025,
-            0, // Middlegame
-            94,
-            281,
-            297,
-            512,
-            936,
-            0
-        }, // Endgame
-        MoveScores = new int[218];
-
-    private int searchMaxTime;
-
     Move rootMove;
-
-    public TyrantBot()
-    {
-        // Big table packed with data from premade piece square tables
-        // Access using using PackedEvaluationTables[square][pieceType] = score
-        UnpackedPestoTables = new[]
-        {
-            63746705523041458768562654720m,
-            71818693703096985528394040064m,
-            75532537544690978830456252672m,
-            75536154932036771593352371712m,
-            76774085526445040292133284352m,
-            3110608541636285947269332480m,
-            936945638387574698250991104m,
-            75531285965747665584902616832m,
-            77047302762000299964198997571m,
-            3730792265775293618620982364m,
-            3121489077029470166123295018m,
-            3747712412930601838683035969m,
-            3763381335243474116535455791m,
-            8067176012614548496052660822m,
-            4977175895537975520060507415m,
-            2475894077091727551177487608m,
-            2458978764687427073924784380m,
-            3718684080556872886692423941m,
-            4959037324412353051075877138m,
-            3135972447545098299460234261m,
-            4371494653131335197311645996m,
-            9624249097030609585804826662m,
-            9301461106541282841985626641m,
-            2793818196182115168911564530m,
-            77683174186957799541255830262m,
-            4660418590176711545920359433m,
-            4971145620211324499469864196m,
-            5608211711321183125202150414m,
-            5617883191736004891949734160m,
-            7150801075091790966455611144m,
-            5619082524459738931006868492m,
-            649197923531967450704711664m,
-            75809334407291469990832437230m,
-            78322691297526401047122740223m,
-            4348529951871323093202439165m,
-            4990460191572192980035045640m,
-            5597312470813537077508379404m,
-            4980755617409140165251173636m,
-            1890741055734852330174483975m,
-            76772801025035254361275759599m,
-            75502243563200070682362835182m,
-            78896921543467230670583692029m,
-            2489164206166677455700101373m,
-            4338830174078735659125311481m,
-            4960199192571758553533648130m,
-            3420013420025511569771334658m,
-            1557077491473974933188251927m,
-            77376040767919248347203368440m,
-            73949978050619586491881614568m,
-            77043619187199676893167803647m,
-            1212557245150259869494540530m,
-            3081561358716686153294085872m,
-            3392217589357453836837847030m,
-            1219782446916489227407330320m,
-            78580145051212187267589731866m,
-            75798434925965430405537592305m,
-            68369566912511282590874449920m,
-            72396532057599326246617936384m,
-            75186737388538008131054524416m,
-            77027917484951889231108827392m,
-            73655004947793353634062267392m,
-            76417372019396591550492896512m,
-            74568981255592060493492515584m,
-            70529879645288096380279255040m,
-        }
-            .Select(
-                packedTable =>
-                    new System.Numerics.BigInteger(packedTable)
-                        .ToByteArray()
-                        .Take(12)
-                        // Using search max time since it's an integer than initializes to zero and is assgined before being used again
-                        .Select(
-                            square =>
-                                (int)((sbyte)square * 1.461) + PieceValues[searchMaxTime++ % 12]
-                        )
-                        .ToArray()
-            )
-            .ToArray();
-    }
 
 #if DEBUG
     long nodes;
@@ -162,10 +166,15 @@ public class TyrantBot : IChessBot
         var historyHeuristics = new int[2, 7, 64];
 
         // 1/13th of our remaining time, split among all of the moves
-        searchMaxTime = timer.MillisecondsRemaining / 13;
+        int searchMaxTime = timer.MillisecondsRemaining / 13,
+            // Progressively increase search depth, starting from 2
+            depth = 2,
+            alpha = -999999,
+            beta = 999999,
+            eval;
 
-        // Progressively increase search depth, starting from 2
-        for (int depth = 2, alpha = -999999, beta = 999999, eval; ; )
+        // Iterative deepening loop
+        for (; ; )
         {
             eval = PVS(depth, alpha, beta, 0, true);
 
@@ -218,11 +227,11 @@ public class TyrantBot : IChessBot
             // Declare some reused variables
             bool inCheck = board.IsInCheck(),
                 canFPrune = false,
-                isRoot = plyFromRoot++ == 0,
+                notRoot = plyFromRoot++ > 0,
                 notPV = beta - alpha == 1;
 
             // Draw detection
-            if (!isRoot && board.IsRepeatedPosition())
+            if (notRoot && board.IsRepeatedPosition())
                 return 0;
 
             ulong zobristKey = board.ZobristKey;
@@ -248,13 +257,13 @@ public class TyrantBot : IChessBot
             if (inCheck)
                 depth++;
 
-            // TODO: Look into Broxholmes' suggestion
+            // TODO: Look into Broxholme's suggestion for TT pruning
 
             // Transposition table lookup -> Found a valid entry for this position
             // Avoid retrieving mate scores from the TT since they aren't accurate to the ply
             if (
                 entryKey == zobristKey
-                && !isRoot
+                && notRoot
                 && entryDepth >= depth
                 && Math.Abs(entryScore) < 50000
                 && (
@@ -271,6 +280,12 @@ public class TyrantBot : IChessBot
                 )
             )
                 return entryScore;
+
+            // Internal Iterative Reductions
+            /*
+            if (entryMove == default && depth > 4)
+                depth--;
+            */
 
             // Declare QSearch status here to prevent dropping into QSearch while in check
             bool inQSearch = depth <= 0;
@@ -300,7 +315,7 @@ public class TyrantBot : IChessBot
                 {
                     board.ForceSkipTurn();
 
-                    // TODO: Play with values: Try a max of 4 instead of 6
+                    // TODO: Play with values: Try a max of 4 or 5 instead of 6
                     Search(beta, 3 + depth / 4 + Math.Min(6, (staticEval - beta) / 175), false);
                     board.UndoSkipTurn();
 
@@ -312,12 +327,6 @@ public class TyrantBot : IChessBot
                 // Extended futility pruning
                 // Can only prune when at lower depth and behind in evaluation by a large margin
                 canFPrune = depth <= 8 && staticEval + depth * 141 <= alpha;
-
-                // Razoring (reduce depth if up a significant margin at depth 3)
-                /*
-                if (depth == 3 && staticEval + 620 <= alpha)
-                    depth--;
-                */
             }
 
             // Generate appropriate moves depending on whether we're in QSearch
@@ -349,7 +358,7 @@ public class TyrantBot : IChessBot
 
             MoveScores.AsSpan(0, moveSpan.Length).Sort(moveSpan);
 
-            Move bestMove = default;
+            Move bestMove = entryMove;
             foreach (Move move in moveSpan)
             {
                 // Out of time -> hard bound exceeded
@@ -365,15 +374,9 @@ public class TyrantBot : IChessBot
 
                 board.MakeMove(move);
 
-                //////////////////////////////////////////////////////
-                ////                                              ////
-                ////                                              ////
-                ////     [You're about to see some terrible]      ////
-                //// [disgusting syntax that saves a few tokens]  ////
-                ////                                              ////
-                ////                                              ////
-                ////                                              ////
-                //////////////////////////////////////////////////////
+                //
+                // Ugly syntax warning
+                //
 
                 // LMR + PVS
                 // Do a full window search if haven't tried any moves or in QSearch
@@ -388,8 +391,7 @@ public class TyrantBot : IChessBot
                         ||
                         // If reduction is applicable do a reduced search with a null window
                         (
-                            Search(alpha + 1, 1 + movesTried / 13 + depth / 9 + (notPV ? 1 : 0))
-                            > alpha
+                            Search(alpha + 1, (notPV ? 2 : 1) + movesTried / 13 + depth / 9) > alpha
                         )
                     )
                         &&
@@ -401,14 +403,6 @@ public class TyrantBot : IChessBot
                     // We either raised alpha on the null window search, or haven't searched yet,
                     // -> research with no null window
                     Search(beta);
-
-                //////////////////////////////////////////////
-                ////                                      ////
-                ////       [~ Exiting syntax hell ~]      ////
-                ////           [Or so you think]          ////
-                ////                                      ////
-                ////                                      ////
-                //////////////////////////////////////////////
 
                 board.UndoMove(move);
 
@@ -422,7 +416,7 @@ public class TyrantBot : IChessBot
                         newTTFlag = 1;
 
                         // Update the root move
-                        if (isRoot)
+                        if (!notRoot)
                             rootMove = move;
                     }
 
@@ -454,7 +448,7 @@ public class TyrantBot : IChessBot
             // Transposition table insertion
             transpositionTable[zobristKey & 0x3FFFFF] = (
                 zobristKey,
-                bestMove == default ? entryMove : bestMove,
+                bestMove,
                 bestEval,
                 depth,
                 newTTFlag
@@ -472,9 +466,7 @@ public class TyrantBot : IChessBot
                 piece,
                 square;
             for (; --sideToMove >= 0; middlegame = -middlegame, endgame = -endgame)
-
-                // TODO: See if I can token optimize using piece = 0 and piece < 5 then incrementing at the last instance of piece
-                for (piece = -1; ++piece < 6; )
+                for (piece = 6; --piece >= 0; )
                     for (
                         ulong mask = board.GetPieceBitboard((PieceType)piece + 1, sideToMove > 0);
                         mask != 0;
@@ -487,14 +479,21 @@ public class TyrantBot : IChessBot
 
                         // Material and square evaluation
                         square = BitboardHelper.ClearAndGetIndexOfLSB(ref mask) ^ 56 * sideToMove;
-                        middlegame += UnpackedPestoTables[square][piece];
-                        endgame += UnpackedPestoTables[square][piece + 6];
+                        middlegame += UnpackedPestoTables[square * 16 + piece];
+                        endgame += UnpackedPestoTables[square * 16 + piece + 6];
 
-                        // Bishop pair bonus (+14.1 elo alone)
+                        // Bishop pair bonus
                         if (piece == 2 && mask != 0)
                         {
-                            middlegame += 22;
-                            endgame += 18;
+                            middlegame += 23;
+                            endgame += 62;
+                        }
+
+                        // Doubled pawns penalty (brought to my attention by Y3737)
+                        if (piece == 0 && (0x101010101010101UL << (square & 7) & mask) > 0)
+                        {
+                            middlegame -= 15;
+                            endgame -= 15;
                         }
 
                         // Semi-open file bonus for rooks (+14.6 elo alone)
@@ -520,7 +519,7 @@ public class TyrantBot : IChessBot
             return (middlegame * gamephase + endgame * (24 - gamephase))
                     / (board.IsWhiteToMove ? 24 : -24)
                 // Tempo bonus to help with aspiration windows
-                + gamephase / 2;
+                + 16;
         }
     }
 }
